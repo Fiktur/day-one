@@ -1,8 +1,11 @@
-import { cn } from '../../lib/cn'
+import { cn, lc } from '../../lib/cn'
 import { useNav } from '../../nav/NavContext'
 import { useDemo } from '../../engine/store'
 import { useViews, ctxOf, useCtx } from '../../engine/selectors'
-import { managerFor, safeName, type HireView } from '../../engine/derive'
+import { managerFor, refName, safeName, type HireView } from '../../engine/derive'
+import { prepActionFor } from './PrepActions'
+import { Emoji, type EmojiName } from '../../ui/assets'
+import { StepActions } from '../../ui/StepRow'
 import { queueFor } from '../../engine/queues'
 import { people } from '../../data/people'
 import { fmtShort } from '../../lib/dates'
@@ -25,6 +28,14 @@ export function MyHires() {
   const upcoming = mine.filter((v) => v.status !== 'started' && v.status !== 'withdrawn').sort((a, b) => a.hire.start - b.hire.start)
   const ramping = mine.filter((v) => v.status === 'started')
   const q = queueFor(views, { person: viewer }, now)
+  // Things to know that aren't the manager's to do: a hire withdrew, or someone else is fixing a risk.
+  const fyi = mine.flatMap((v): { v: HireView; emoji: EmojiName; title: string; text: string }[] => {
+    const first = v.person.name.split(' ')[0]
+    if (v.status === 'withdrawn') return [{ v, emoji: 'envelope', title: `${first} withdrew on ${fmtShort(v.hire.withdrawn!)}.`, text: 'Nothing needed from you. Open steps closed and messages stopped.' }]
+    const p = v.primary
+    if (v.status === 'atrisk' && p?.holder && !(p.holder.kind === 'person' && p.holder.id === viewer)) return [{ v, emoji: 'warning', title: `${first}'s start date is at risk.`, text: `Waiting on ${refName(p.holder)}: ${lc(p.label)}. Maria Hill is on it; nothing needed from you yet.` }]
+    return []
+  })
 
   return (
     <Page>
@@ -41,22 +52,39 @@ export function MyHires() {
         </div>
       )}
 
+      <section className="mb-5">
+        <div className="mb-2 flex items-baseline justify-between">
+          <h2 className="font-display text-lg font-bold">Your move</h2>
+          <span className="text-xs text-muted">{q.move.length} now</span>
+        </div>
+        <Card className="p-1.5">
+          {q.move.length === 0 && <Empty title="Nothing needs you right now" />}
+          {q.move.map((x) => <StepRow key={x.view.hire.id + x.step.key} view={x.view} step={x.step} showHire showSource={false} actions={prepActionFor(x.view, x.step)} onOpen={() => go({ name: 'hire', hireId: x.view.hire.id })} />)}
+          {q.coming.length > 0 && (
+            <details className="group px-2.5 py-1.5 text-[13px]">
+              <summary className="cursor-pointer list-none text-xs font-medium text-muted hover:text-ink">{q.coming.length} coming up <span className="group-open:hidden">· show</span></summary>
+              <div className="mt-1">{q.coming.map((x) => <StepRow key={x.view.hire.id + x.step.key} view={x.view} step={x.step} showHire showSource={false} dense />)}</div>
+            </details>
+          )}
+        </Card>
+      </section>
+
+      {fyi.length > 0 && (
+        <section className="mb-5 space-y-2">
+          {fyi.map((f) => (
+            <button key={f.v.hire.id} type="button" onClick={() => go({ name: 'hire', hireId: f.v.hire.id })} className="flex w-full items-start gap-3 rounded-2xl border border-line bg-surface px-3.5 py-2.5 text-left text-[13px] shadow-card hover:bg-bg">
+              <Emoji name={f.emoji} size={24} />
+              <span className="min-w-0"><span className="font-semibold">{f.title}</span> <span className="text-muted">{f.text}</span></span>
+              <span className="ml-auto shrink-0 font-mono text-[10px] uppercase tracking-wider text-faint">FYI</span>
+            </button>
+          ))}
+        </section>
+      )}
+
       <div className={cn('grid gap-3', compact ? 'grid-cols-1' : 'grid-cols-[repeat(auto-fill,minmax(290px,1fr))]')}>
         {upcoming.map((v, i) => <Reveal key={v.hire.id} i={i}><Tilt max={4}><HireCard v={v} /></Tilt></Reveal>)}
         {ramping.map((v, i) => <Reveal key={v.hire.id} i={upcoming.length + i}><Tilt max={4}><RampCard v={v} /></Tilt></Reveal>)}
       </div>
-
-      <section className="mt-6">
-        <div className="mb-2 flex items-baseline justify-between">
-          <h2 className="font-display text-lg font-bold">Your move</h2>
-          <span className="text-xs text-muted">{q.move.length} now · {q.coming.length} coming up</span>
-        </div>
-        <Card className="p-1.5">
-          {q.move.length === 0 && <Empty title="Nothing needs you right now" />}
-          {q.move.map((x) => <StepRow key={x.view.hire.id + x.step.key} view={x.view} step={x.step} showHire showSource={false} onOpen={() => go({ name: 'hire', hireId: x.view.hire.id })} />)}
-          {q.coming.slice(0, compact ? 3 : 5).map((x) => <StepRow key={x.view.hire.id + x.step.key} view={x.view} step={x.step} showHire showSource={false} dense />)}
-        </Card>
-      </section>
     </Page>
   )
 }
@@ -106,15 +134,15 @@ function RampCard({ v }: { v: HireView }) {
   const now = useDemo((s) => s.now)
   const ramp = v.steps.filter((s) => s.def.stage >= 5 && (s.key === 'milestone' || s.key === 'checkin30' || s.key === 'benefits'))
   return (
-    <button type="button" onClick={() => go({ name: 'hire', hireId: v.hire.id })} className="flex w-full flex-col gap-3 rounded-[20px] border border-line/80 bg-surface p-4 text-left shadow-card transition hover:shadow-lift">
-      <div className="flex items-start gap-3">
+    <div className="flex w-full flex-col gap-3 rounded-[20px] border border-line/80 bg-surface p-4 text-left shadow-card transition hover:shadow-lift">
+      <button type="button" onClick={() => go({ name: 'hire', hireId: v.hire.id })} className="flex items-start gap-3 text-left">
         <Avatar id={v.hire.id} size={36} />
         <div className="min-w-0 flex-1">
           <div className="truncate font-semibold">{v.person.name}</div>
           <div className="truncate text-xs text-muted">{v.hire.title} · day {now - v.hire.start + 1}</div>
         </div>
         <StatusPill status="started" />
-      </div>
+      </button>
       <Eyebrow>First 90 days <ReqTag ids="T10" /></Eyebrow>
       <div className="space-y-1.5">
         {ramp.map((s) => (
@@ -122,10 +150,11 @@ function RampCard({ v }: { v: HireView }) {
             <Glyph state={s.state === 'open' ? 'prog' : s.state} size={12} />
             <span className={cn('flex-1 truncate', s.state === 'blank' ? 'text-muted' : 'font-medium')}>{s.name}</span>
             <span className="shrink-0 text-muted">{s.state === 'verified' ? fmtShort(s.ver!) : s.label.replace('Due ', 'by ')}</span>
+            <StepActions view={v} step={s} />
           </div>
         ))}
       </div>
       <div className="text-[11px] text-muted">Contribution is tracked apart from paperwork.</div>
-    </button>
+    </div>
   )
 }

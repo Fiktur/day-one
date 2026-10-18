@@ -10,6 +10,7 @@ import { STATUS_LABEL, managerFor, refName, safeName, type HireView } from '../e
 import { queueFor } from '../engine/queues'
 import { messagesFor } from '../engine/messages'
 import { checkDates, hypothetical } from '../engine/startcheck'
+import { buddyOf } from '../hire/helpers'
 import { clockTime, entry } from '../engine/log'
 
 export interface AssistantAction {
@@ -77,6 +78,7 @@ function hireReply(viewer: string, q: string): AssistantReply {
   const v = selectViews(s)[viewer]
   const t = q.toLowerCase()
   const h = v.hire
+  const buddy = buddyOf(v)
 
   if (/(change|update|different|new).*(address|deliver)|deliver.*(somewhere|elsewhere|address)/.test(t)) {
     const shipped = v.by.laptop_ship?.state === 'verified'
@@ -132,7 +134,7 @@ function hireReply(viewer: string, q: string): AssistantReply {
         'Sign in with your new work account. Your laptop is already set up.',
         `${sess ? sess.time.split('–')[0] : '9:00 am'}: orientation${sess ? `, ${sess.where.toLowerCase()}` : ''}, with the rest of your start group`,
         `1:00 pm: first 1:1 with ${first(managerFor(h, ctxOf(s)).id)}`,
-        h.buddyId ? `Day two: coffee with your buddy, ${people[h.buddyId].name}` : 'Your manager will introduce you to the team',
+        buddy ? `Day two: coffee with your buddy, ${people[buddy].name}` : 'Your manager will introduce you to the team',
       ],
       sources: ['Day One · your first week', 'Calendar · orientation invite'],
     }
@@ -154,7 +156,7 @@ function hireReply(viewer: string, q: string): AssistantReply {
     }
   }
   if (/buddy|team|who/.test(t)) {
-    return { text: h.buddyId ? `Your buddy is ${people[h.buddyId].name}. You'll have coffee on day two.` : 'Your manager will introduce you to the team in week one.', sources: ['Day One · your people'] }
+    return { text: buddy ? `Your buddy is ${people[buddy].name}. You'll have coffee on day two.` : 'Your manager is picking your buddy and will introduce you to the team in week one.', sources: ['Day One · your people'] }
   }
   if (/person|human|talk|someone/.test(t)) {
     s.addRequest(h.id, q, 'maria')
@@ -172,7 +174,7 @@ function managerReply(viewer: string, q: string): AssistantReply {
   if (/draft|welcome message|write/.test(t)) {
     const v = findHire(q, mineHires[0]?.hire.id) ?? mineHires[0]
     if (!v) return fallback()
-    const draft = `Hi ${first(v.hire.id)}, I'm really glad you're joining us. Your first project is the edge routing rollout, and you'll pair with ${v.hire.buddyId ? first(v.hire.buddyId) : 'the team'} on it. Your first week is planned, and I've kept Wednesday afternoon free so we can talk properly. See you ${fmtWeekdayShort(v.hire.start)}. ${first(viewer)}`
+    const draft = `Hi ${first(v.hire.id)}, I'm really glad you're joining us. Your first project is the edge routing rollout, and you'll pair with ${buddyOf(v) ? first(buddyOf(v)!) : 'the team'} on it. Your first week is planned, and I've kept Wednesday afternoon free so we can talk properly. See you ${fmtWeekdayShort(v.hire.start)}. ${first(viewer)}`
     return {
       text: `Here's a draft for ${first(v.hire.id)}. It sends ${fmtDay(v.hire.start - 7)} in your name unless you change it.`,
       bullets: [draft],

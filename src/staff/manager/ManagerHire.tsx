@@ -13,6 +13,7 @@ import { Page } from '../StaffShell'
 import { areaSummary, startLine } from '../shared/summaries'
 import { MessageEditor } from './MessageEditor'
 import { safeName } from '../../engine/derive'
+import { prepActionFor } from './PrepActions'
 
 export function ManagerHire() {
   const { route, go, viewer, compact, person } = useNav()
@@ -91,7 +92,7 @@ export function ManagerHire() {
               step={s}
               showSource={false}
               showHolder={false}
-              actions={(s.key === 'hello' || s.key === 'board_invite') && (s.state === 'open' || s.state === 'soon' || s.state === 'late') ? <Button size="xs" variant="primary" onClick={() => go({ name: 'studio', hireId: v.hire.id })}>{s.key === 'hello' ? 'Record' : 'Invite'}</Button> : undefined}
+              actions={prepActionFor(v, s)}
             />
           ))}
         </Card>

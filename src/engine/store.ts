@@ -35,6 +35,9 @@ export interface DateChange {
   approvedBy: string
 }
 
+export type PlanDay = { t: string; l: string }[]
+export interface Nudge { hireId: string; key: string; to: string; by: string; day: number }
+
 export interface HelpRequest {
   id: string
   hireId: string
@@ -91,6 +94,15 @@ interface Data {
   dayOneSeen: string[]
   /** Orientation sessions whose invites the program manager sent in the demo, by session id. */
   invitesSentFor: Record<string, number>
+  /** What managers set up in the demo, by hire: the buddy they picked, the first-week plan, the first piece of work. */
+  buddies: Record<string, string>
+  plans: Record<string, PlanDay[]>
+  firstWork: Record<string, { title: string; link: string }>
+  /** Who took a team step, by "hire:key". */
+  claims: Record<string, string>
+  nudges: Nudge[]
+  /** Orientation speakers confirmed in the demo, as "session:time". */
+  speakers: string[]
 }
 
 interface Actions {
@@ -110,6 +122,11 @@ interface Actions {
   addLog: (...e: LogEntry[]) => void
   flash: (...keys: string[]) => void
   addRequest: (hireId: string, text: string, to: string) => void
+  assignBuddy: (hireId: string, buddyId: string, by: string) => void
+  savePlan: (hireId: string, plan: PlanDay[], by: string) => void
+  setFirstWork: (hireId: string, work: { title: string; link: string }, by: string) => void
+  claim: (hireId: string, key: string, by: string) => void
+  nudge: (hireId: string, key: string, to: string, by: string) => void
   // Welcome boards
   boardFor: (hireId: string) => Board
   invite: (hireId: string, personIds: string[], by: string) => void
@@ -177,6 +194,12 @@ function initial(): Data {
     intro: true,
     dayOneSeen: [],
     invitesSentFor: {},
+    buddies: {},
+    plans: {},
+    firstWork: {},
+    claims: {},
+    nudges: [],
+    speakers: [],
   }
 }
 
@@ -304,6 +327,35 @@ export const useDemo = create<DemoState>()((set, get) => ({
   addRequest: (hireId, text, to) => {
     const s = get()
     set({ requests: [{ id: `r${s.requests.length + 1}`, hireId, text, day: s.now, to }, ...s.requests] })
+  },
+
+  assignBuddy: (hireId, buddyId, by) => {
+    set((s) => ({ buddies: { ...s.buddies, [hireId]: buddyId } }))
+    get().markDone(hireId, 'buddy', by)
+    get().addLog(entry(get().now, hhmm(), 'day one', 'buddy.assigned', `${nameOf(hireId)} · buddy ${nameOf(buddyId)} · by ${nameOf(by)}`, 'ok', nameOf(hireId)))
+  },
+
+  savePlan: (hireId, plan, by) => {
+    set((s) => ({ plans: { ...s.plans, [hireId]: plan } }))
+    get().markDone(hireId, 'first_week', by)
+  },
+
+  setFirstWork: (hireId, work, by) => {
+    set((s) => ({ firstWork: { ...s.firstWork, [hireId]: work } }))
+    get().markDone(hireId, 'first_work', by)
+  },
+
+  claim: (hireId, key, by) => {
+    const s = get()
+    set({ claims: { ...s.claims, [`${hireId}:${key}`]: by } })
+    get().flash(`${hireId}:${key}`)
+    get().addLog(entry(s.now, hhmm(), 'day one', 'step.claimed', `${nameOf(hireId)} · ${STEP_BY_KEY[key]?.name} · taken by ${nameOf(by)}`, 'info', nameOf(hireId)))
+  },
+
+  nudge: (hireId, key, to, by) => {
+    const s = get()
+    set({ nudges: [...s.nudges, { hireId, key, to, by, day: s.now }] })
+    get().addLog(entry(s.now, hhmm(), 'day one', 'nudge.sent', `${nameOf(hireId)} · ${STEP_BY_KEY[key]?.name} · ${to} nudged by ${nameOf(by)}`, 'info', nameOf(hireId)))
   },
 
   boardFor: (hireId) => {

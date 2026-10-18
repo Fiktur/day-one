@@ -12,6 +12,8 @@ import { Page, PageHeader } from '../StaffShell'
 import { AnimatePresence, Num, Reveal, Segmented, motion, springs } from '../../ui/motion'
 import { Emoji } from '../../ui/assets'
 import { MapLegend, NODE_META, SystemsMap, type MapNode } from './SystemsMap'
+import { useAffected } from '../program/Incident'
+import { safeName } from '../../engine/derive'
 
 const SYSTEMS: Exclude<SystemId, 'dayone'>[] = ['greenhouse', 'workday', 'checkr', 'firstbase', 'google', 'calendar', 'immigration', 'benefits', 'badge']
 
@@ -111,6 +113,7 @@ function SystemDetail({ sel }: { sel: MapNode }) {
               <h3 className="font-semibold">{systemNames[sel]}</h3>
               <Pill tone={s.down[sel] != null ? 'red' : 'green'}>{s.down[sel] != null ? 'Down' : 'Up'}</Pill>
             </div>
+            {s.down[sel] != null && <DownSteps sys={sel} />}
             {CONTRACT[sel] ? (
               <dl className="grid grid-cols-[86px_1fr] gap-x-3 gap-y-1.5 text-[13px]">
                 {Object.entries({ Reads: CONTRACT[sel]!.reads, Writes: CONTRACT[sel]!.writes, Trigger: CONTRACT[sel]!.trigger, Freshness: CONTRACT[sel]!.freq, Owner: CONTRACT[sel]!.owner, 'If it fails': CONTRACT[sel]!.failure }).map(([k, val]) => (
@@ -123,6 +126,21 @@ function SystemDetail({ sel }: { sel: MapNode }) {
               <Button size="sm" variant="ghost" onClick={() => toast.success('Retry sent', { description: 'Failed updates resume from the step that failed, without duplicating orders or checks.' })}><RefreshCw className="h-3.5 w-3.5" />Retry failed updates</Button>
             </div>
           </Card>
+  )
+}
+
+/** What a down system is holding up, and what Day One will retry once it's back. */
+function DownSteps({ sys }: { sys: SystemId }) {
+  const { person } = useNav()
+  const affected = useAffected(sys)
+  return (
+    <div className="rounded-xl bg-red-soft/60 px-3 py-2 text-[13px]">
+      <div className="font-medium">{affected.length ? `${affected.length} step${affected.length > 1 ? 's' : ''} can't be checked right now` : 'Nothing is waiting on it right now'}</div>
+      <ul className="mt-1 space-y-0.5 text-xs">
+        {affected.map(({ view, step }) => <li key={view.hire.id + step.key}><span className="font-medium">{view.person.name}</span> · {safeName(step, { role: person.role, team: person.team })}</li>)}
+      </ul>
+      <div className="mt-1.5 text-xs text-muted">Retry queue: {affected.length} update{affected.length === 1 ? '' : 's'} · next try in 5 min. Each resumes from the step that failed.</div>
+    </div>
   )
 }
 

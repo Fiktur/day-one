@@ -10,15 +10,15 @@ export function ctxOf(s: DemoState): DeriveCtx {
   return { now: s.now, setup: s.setup, down: s.down, ooo: s.ooo, forced: s.forced }
 }
 
-export function hireState(s: Pick<DemoState, 'hires'>, id: string): HireState {
+export function hireState(s: Pick<DemoState, 'hires' | 'buddies'>, id: string): HireState {
   const base = HIRES.find((h) => h.id === id)!
   const mut = s.hires[id]
-  return { ...base, start: mut.start, originalStart: mut.originalStart, withdrawn: mut.withdrawn }
+  return { ...base, buddyId: s.buddies[id] ?? base.buddyId, start: mut.start, originalStart: mut.originalStart, withdrawn: mut.withdrawn }
 }
 
 /** Every hire's derived view, recomputed only when the inputs change. */
 export function selectViews(s: DemoState): Record<string, HireView> {
-  const key = [s.now, s.setup, s.down, s.forced, s.hires, s.ooo]
+  const key = [s.now, s.setup, s.down, s.forced, s.hires, s.ooo, s.buddies]
   if (cache && key.every((k, i) => k === cache!.key[i])) return cache.value
   const ctx = ctxOf(s)
   const value: Record<string, HireView> = {}

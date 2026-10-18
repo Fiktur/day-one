@@ -6,7 +6,6 @@ import { useNav } from '../nav/NavContext'
 import { useView, useCtx } from '../engine/selectors'
 import { useDemo } from '../engine/store'
 import { people } from '../data/people'
-import { SESSIONS, groupFor } from '../data/cohorts'
 import { PEPPER_VIDEO } from '../data/welcome'
 import { fmtDay, fmtWeekdayShort, rel } from '../lib/dates'
 import { managerFor } from '../engine/derive'
@@ -17,6 +16,7 @@ import { burst } from '../ui/fx'
 import { Emoji, type EmojiName } from '../ui/assets'
 import { motion, springs } from '../ui/motion'
 import { ShipTracker } from './Home'
+import { buddyOf, usePlan } from './helpers'
 
 export function FirstWeek() {
   const { viewer } = useNav()
@@ -25,15 +25,9 @@ export function FirstWeek() {
   const ctx = useCtx()
   const h = v.hire
   const mgr = people[managerFor(h, ctx).id]
-  const session = SESSIONS.find((s) => s.day === h.start && s.group === groupFor(h))
   const planReady = v.by.first_week?.state === 'verified'
-  const days = [
-    { d: h.start, items: [['9:00', session ? `Orientation · ${session.where}` : 'Orientation'], ['1:00 pm', `First 1:1 with ${mgr.name.split(' ')[0]}`], ['3:00 pm', 'Set up your tools with IT, if anything is left']] },
-    { d: h.start + 1, items: [['10:00', h.buddyId ? `Coffee with ${people[h.buddyId].name.split(' ')[0]}, your buddy` : 'Team coffee'], ['2:00 pm', 'Team standup and introductions']] },
-    { d: h.start + 2, items: [['All day', 'Focus time: no-meeting Wednesday'], ['', 'Read the onboarding guide for your team']] },
-    { d: h.start + 3, items: [['11:00', 'Walkthrough of your first piece of work'], ['3:00 pm', 'Lunch and learn']] },
-    { d: h.start + 4, items: [['3:00 pm', 'Friday demo hour'], ['4:00 pm', `Week-one check-in with ${mgr.name.split(' ')[0]}`]] },
-  ]
+  const { plan } = usePlan(v)
+  const days = plan.map((items, i) => ({ d: h.start + i, items: items.map((x) => [x.t, x.l]) }))
   return (
     <div className="space-y-3 px-4 pb-6">
       {!planReady && (
@@ -69,7 +63,7 @@ export function People() {
   const h = v.hire
   const list = [
     { id: managerFor(h, ctx).id, role: 'Your manager' },
-    ...(h.buddyId ? [{ id: h.buddyId, role: 'Your buddy for the first few weeks' }] : []),
+    ...(buddyOf(v) ? [{ id: buddyOf(v)!, role: 'Your buddy for the first few weeks' }] : []),
     { id: 'maria', role: 'Onboarding team · your go-to for anything' },
     { id: h.recruiterId, role: 'Your recruiter, until day one' },
     { id: 'shuri', role: 'IT · laptop and accounts' },
@@ -164,11 +158,13 @@ export function SignIn() {
 
 export function Withdrawn() {
   const { viewer } = useNav()
+  const v = useView(viewer)!
   return (
     <div className="space-y-3 px-6 py-10 text-center">
       <ShieldCheck className="mx-auto h-8 w-8 text-muted" />
       <h1 className="font-display text-xl font-bold">Your onboarding is closed</h1>
       <p className="text-[13px] text-muted">Thanks for letting us know, {people[viewer].name.split(' ')[0]}. We've stopped all messages and cancelled anything in progress. If you change your mind, reply to Kate Bishop.</p>
+      <p className="text-[13px] text-muted">We delete your personal details on <span className="font-medium text-ink">{fmtDay(v.hire.withdrawn! + 30)}</span>, 30 days after you withdrew. Documents in Workday and Checkr follow their own retention rules.</p>
     </div>
   )
 }

@@ -26,7 +26,9 @@ export function messagesFor(v: HireView, ctx: DeriveCtx, edits: Record<string, {
   const h = v.hire
   const now = ctx.now
   const first = v.person.name.split(' ')[0]
-  const mgr = managerFor(h, ctx).id
+  // A covering manager can edit, but the note still comes from the hire's real manager.
+  const mgr = h.managerId
+  const cover = managerFor(h, ctx).id
   const mgrFirst = people[mgr]?.name.split(' ')[0] ?? 'Your manager'
   const buddyPicked = v.by.buddy?.ver != null && v.by.buddy.ver <= now && !!h.buddyId
   const buddyFirst = buddyPicked ? people[h.buddyId!]?.name.split(' ')[0] ?? null : null
@@ -67,7 +69,7 @@ export function messagesFor(v: HireView, ctx: DeriveCtx, edits: Record<string, {
 
     let fromId: string | null = null
     let from = FROM_LABEL[t.from]
-    if (t.from === 'manager') { fromId = mgr; from = people[mgr]?.name ?? from }
+    if (t.from === 'manager') { fromId = mgr; from = `${people[mgr]?.name ?? from}${cover !== mgr ? `, sent by ${people[cover]?.name} on their behalf` : ''}` }
     if (t.from === 'buddy' && buddyPicked) { fromId = h.buddyId!; from = people[fromId]?.name ?? from }
     if (t.from === 'company') fromId = 'pepper'
     if (t.from === 'program') fromId = 'maria'

@@ -89,7 +89,7 @@ export function MarkDoneButton({ view, step, label = 'Mark done', size = 'xs' }:
   )
 }
 
-export function StepActions({ view, step }: { view: HireView; step: StepView }) {
+export function StepActions({ view, step, compact }: { view: HireView; step: StepView; compact?: boolean }) {
   const { viewer, person } = useNav()
   const confirm = useDemo((s) => s.confirmStep)
   const markNA = useDemo((s) => s.markNA)
@@ -108,13 +108,13 @@ export function StepActions({ view, step }: { view: HireView; step: StepView }) 
   const teamOwner = person.role === 'team' || person.role === 'program'
   return (
     <div className="flex items-center gap-1">
-      {step.mode !== 'native' && step.mode !== 'manual' && (
+      {!compact && step.mode !== 'native' && step.mode !== 'manual' && (
         <Button size="xs" variant="ghost" onClick={() => toast(`Opens ${systemNames[step.def.system]} in a new tab`, { description: 'In the demo nothing leaves this page.' })}>
           {systemNames[step.def.system]} <ExternalLink className="h-3 w-3" />
         </Button>
       )}
       <MarkDoneButton view={view} step={step} />
-      {teamOwner && (
+      {teamOwner && !compact && (
         <Dropdown trigger={<Button size="xs" variant="ghost" aria-label="More actions"><MoreHorizontal className="h-3.5 w-3.5" /></Button>}>
           <DropItem onSelect={() => { markNA(view.hire.id, step.key, 'Not needed for this hire', viewer); toast(`Marked not needed: ${name}`) }}>Mark not needed…</DropItem>
           <DropItem onSelect={() => toast('Reassign', { description: 'Pick a teammate to take this step. (Demo only.)' })}>Reassign…</DropItem>
