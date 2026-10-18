@@ -242,7 +242,7 @@ export function StaffShell() {
           </aside>
         )}
         <main className="scroll-thin relative min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
-          <PageTransition id={`${route.name}:${route.hireId ?? ''}`}>
+          <PageTransition id={`${route.name}:${route.hireId ?? ''}:${route.tab ?? ''}`}>
             <Content />
           </PageTransition>
         </main>
