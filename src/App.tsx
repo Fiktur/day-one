@@ -7,6 +7,7 @@ import { runScenario } from './engine/scenarios'
 import { PresenterBar, ScenarioCaption, ShowBarButton } from './presenter/PresenterBar'
 import { MainView, SplitView } from './presenter/Panes'
 import { UnderTheHood } from './presenter/UnderTheHood'
+import { Outbox } from './presenter/Outbox'
 import { CommandPalette } from './presenter/CommandPalette'
 import { ChangeDateDialog } from './presenter/ChangeDateDialog'
 import { Intro } from './presenter/Intro'
@@ -53,6 +54,7 @@ function useShortcuts() {
       else if (e.key === ']') { e.preventDefault(); s.shiftNow(1) }
       else if (e.key === '\\') s.setSplit(!s.split)
       else if (e.key === 'u') s.set({ underHood: !s.underHood })
+      else if (e.key === 'o') s.set({ outbox: !s.outbox })
       else if (e.key === 't') s.set({ tags: !s.tags })
       else if (e.key === '.') s.set({ presenterHidden: !s.presenterHidden })
       else if (e.key === 'R' && e.shiftKey) { s.reset(); clearChats() }
@@ -81,6 +83,7 @@ export default function App() {
       </div>
       <Intro />
       <UnderTheHood />
+      <Outbox />
       <CommandPalette />
       <ChangeDateDialog />
       <Toaster position={hood ? 'top-center' : 'bottom-right'} offset={hood ? 76 : 16} richColors closeButton theme={theme === 'system' ? 'system' : theme} toastOptions={{ style: { fontFamily: 'inherit' } }} />

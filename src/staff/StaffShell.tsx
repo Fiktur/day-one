@@ -257,7 +257,7 @@ export function StaffShell() {
         <div className="flex-1" />
         {!compact && (
           <button type="button" onClick={() => setPalette(true)} className="hidden h-8 w-56 items-center justify-between rounded-xl border border-line bg-surface/70 px-2.5 text-[13px] text-faint transition hover:border-accent/40 hover:shadow-glow lg:flex">
-            <span className="flex items-center gap-1.5"><Search className="h-3.5 w-3.5" />Jump to a person or page</span><Kbd>⌘K</Kbd>
+            <span className="flex items-center gap-1.5"><Search className="h-3.5 w-3.5" />Search people, pages, steps</span><Kbd>⌘K</Kbd>
           </button>
         )}
         <motion.button type="button" aria-label="Ask Day One" onClick={() => setAssistant(true)} whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.9 }} transition={springs.bouncy} className="flex h-8 items-center gap-1.5 rounded-xl btn-gradient px-2.5 text-[12px] font-semibold text-white shadow-glow"><Bot className="h-4 w-4" />{!compact && 'Ask'}</motion.button>

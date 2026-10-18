@@ -130,12 +130,12 @@ function SystemDetail({ sel }: { sel: MapNode }) {
 }
 
 /** What a down system is holding up, and what Day One will retry once it's back. */
-function DownSteps({ sys }: { sys: SystemId }) {
+function DownSteps({ sys, titled }: { sys: SystemId; titled?: boolean }) {
   const { person } = useNav()
   const affected = useAffected(sys)
   return (
     <div className="rounded-xl bg-red-soft/60 px-3 py-2 text-[13px]">
-      <div className="font-medium">{affected.length ? `${affected.length} step${affected.length > 1 ? 's' : ''} can't be checked right now` : 'Nothing is waiting on it right now'}</div>
+      <div className="font-medium">{titled ? `${systemNames[sys]} isn't responding · ` : ''}{affected.length ? `${affected.length} step${affected.length > 1 ? 's' : ''} can't be checked right now` : 'Nothing is waiting on it right now'}</div>
       <ul className="mt-1 space-y-0.5 text-xs">
         {affected.map(({ view, step }) => <li key={view.hire.id + step.key}><span className="font-medium">{view.person.name}</span> · {safeName(step, { role: person.role, team: person.team })}</li>)}
       </ul>
@@ -159,6 +159,8 @@ function MapTab({ sel, setSel }: { sel: MapNode; setSel: (n: MapNode) => void })
   ]
   return (
     <div className="space-y-4">
+      {/* An outage leads the page: what it holds up shows before the map, not under it. */}
+      {(Object.keys(s.down) as SystemId[]).map((sys) => <DownSteps key={sys} sys={sys} titled />)}
       <div className={cn('grid gap-3', compact ? 'grid-cols-2' : 'grid-cols-4')}>
         {stats.map((x, i) => (
           <Reveal key={x.label} i={i}>

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Command } from 'cmdk'
 import * as D from '@radix-ui/react-dialog'
 import { Search } from 'lucide-react'
@@ -5,7 +6,8 @@ import { useDemo, defaultRoute } from '../engine/store'
 import { useViews } from '../engine/selectors'
 import { SCENARIOS, runScenario } from '../engine/scenarios'
 import { people, personRoleLabel, switcherGroups } from '../data/people'
-import { Avatar } from '../ui/parts'
+import { Avatar, Glyph } from '../ui/parts'
+import { safeName } from '../engine/derive'
 import { Emoji, type EmojiName } from '../ui/assets'
 import { navFor } from '../staff/StaffShell'
 import type { Route } from '../engine/store'
@@ -40,7 +42,8 @@ export function CommandPalette() {
   const open = useDemo((s) => s.palette)
   const set = useDemo((s) => s.set)
   const views = useViews()
-  const close = () => set({ palette: false })
+  const [q, setQ] = useState('')
+  const close = () => { set({ palette: false }); setQ('') }
   const become = (id: string) => { set({ split: false, main: { viewer: id, route: defaultRoute(id) } }); close() }
   const openHire = (id: string) => { set({ split: false, main: { viewer: 'maria', route: { name: 'hire', hireId: id } } }); close() }
   const item = 'flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-[13px]'
@@ -54,7 +57,7 @@ export function CommandPalette() {
           <Command label="Command palette" loop>
             <div className="flex items-center gap-2 border-b border-line px-3">
               <Search className="h-4 w-4 text-faint" />
-              <Command.Input autoFocus placeholder="Jump to a person, a hire, or a scenario…" className="h-12 flex-1 bg-transparent text-[14px] outline-none placeholder:text-faint focus-visible:outline-none" />
+              <Command.Input autoFocus value={q} onValueChange={setQ} placeholder="Jump to a person, a hire, a step, or a scenario…" className="h-12 flex-1 bg-transparent text-[14px] outline-none placeholder:text-faint focus-visible:outline-none" />
             </div>
             <Command.List className="scroll-thin max-h-[56vh] overflow-y-auto p-1.5">
               <Command.Empty className="px-3 py-6 text-center text-[13px] text-muted">No matches.</Command.Empty>
@@ -73,6 +76,21 @@ export function CommandPalette() {
                   </Command.Item>
                 ))}
               </Command.Group>
+              {/* Steps only once the search has a word in it: there are hundreds, and the empty palette stays short. */}
+              {q.trim().length >= 2 && (
+                <Command.Group heading="Steps">
+                  {Object.values(views).filter((v) => v.status !== 'withdrawn').flatMap((v) => v.steps.filter((s) => !s.def.cancel && s.state !== 'na').map((s) => {
+                    const name = safeName(s, { role: 'program' }, { action: true })
+                    return (
+                      <Command.Item key={v.hire.id + s.key} value={`step ${name} ${s.def.name} ${v.person.name} ${s.label}`} onSelect={() => { set({ split: false, main: { viewer: 'maria', route: { name: 'hire', hireId: v.hire.id, step: s.key } } }); close() }} className={item}>
+                        <Glyph state={s.state} red={s.red} size={12} />
+                        <span className="min-w-0 truncate">{name}</span>
+                        <span className="ml-auto shrink-0 text-xs text-faint">{v.person.name.split(' ')[0]} · {s.label}</span>
+                      </Command.Item>
+                    )
+                  }))}
+                </Command.Group>
+              )}
               <Command.Group heading="Open a hire record">
                 {Object.values(views).map((v) => (
                   <Command.Item key={v.hire.id} value={`hire ${v.person.name} ${v.hire.title}`} onSelect={() => openHire(v.hire.id)} className={item}>
@@ -90,6 +108,7 @@ export function CommandPalette() {
               <Command.Group heading="Demo">
                 <Command.Item value="split view" onSelect={() => { set({ split: true }); close() }} className={item}>Split view: three people side by side</Command.Item>
                 <Command.Item value="under the hood event log" onSelect={() => { set({ underHood: true }); close() }} className={item}>Under the hood: event log</Command.Item>
+                <Command.Item value="outbox notifications pings slack email" onSelect={() => { set({ outbox: true }); close() }} className={item}>Outbox: today's notifications</Command.Item>
                 <Command.Item value="requirement tags" onSelect={() => { set({ tags: !useDemo.getState().tags }); close() }} className={item}>Toggle requirement tags</Command.Item>
                 <Command.Item value="automatic manual updates setup" onSelect={() => { useDemo.getState().setSetup(useDemo.getState().setup === 'manual' ? 'connected' : 'manual'); close() }} className={item}>Switch automatic / manual updates</Command.Item>
                 <Command.Item value="reset demo" onSelect={() => { useDemo.getState().reset(); clearChats(); close() }} className={item}>Reset the demo</Command.Item>

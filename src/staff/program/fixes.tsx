@@ -1,8 +1,7 @@
 import { toast } from 'sonner'
 import { useNav } from '../../nav/NavContext'
 import { useDemo, type DemoState } from '../../engine/store'
-import { refName, type HireView, type Ref, type StepView } from '../../engine/derive'
-import { HIRES } from '../../data/hires'
+import { coverFor, refName, type HireView, type Ref, type StepView } from '../../engine/derive'
 import { people, teams, type TeamId } from '../../data/people'
 import { systemNames } from '../../data/journey'
 import { Button } from '../../ui/parts'
@@ -11,12 +10,6 @@ import { burst } from '../../ui/fx'
 export interface Fix { label: string; run: () => void }
 
 const callName = (r: Ref) => (r.kind === 'person' ? (people[r.id]?.name ?? r.name).split(' ')[0] : r.kind === 'team' ? teams[r.id as TeamId].short : r.name)
-
-/** Someone who can cover for an absent manager: another manager, not a buddy and not away themselves. */
-export function coverFor(managerId: string, ooo: DemoState['ooo'], now: number): string | undefined {
-  const pool = Object.values(people).filter((p) => p.role === 'manager' && p.id !== managerId && !HIRES.some((h) => h.buddyId === p.id) && !(ooo[p.id] && now <= ooo[p.id].until))
-  return (pool.find((p) => p.id === 'lucius') ?? pool[0])?.id
-}
 
 /**
  * The one move that unsticks a step, by why it is stuck: owner away → reassign, a person or team → nudge,

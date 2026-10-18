@@ -1,5 +1,6 @@
 import { AREAS, SYSTEM_MODES, SYSTEM_STEWARD, STEP_BY_KEY, systemNames, type Area, type Mode, type Setup, type StepDef, type SystemId } from '../data/journey'
 import { people, providers, teams, type Person, type ProviderId, type TeamId } from '../data/people'
+import { HIRES } from '../data/hires'
 import { bizBetween, daysWord, fmtDay, fmtShort, rel } from '../lib/dates'
 import { simulate, type Forced, type HireState, type SimStep } from './simulate'
 
@@ -92,6 +93,12 @@ export function managerFor(h: HireState, ctx: DeriveCtx): { id: string; away: bo
     return { id: h.managerId, away: true }
   }
   return { id: h.managerId, away: false }
+}
+
+/** Someone who can cover for an absent manager: another manager, not a buddy and not away themselves. */
+export function coverFor(managerId: string, ooo: DeriveCtx['ooo'], now: number): string | undefined {
+  const pool = Object.values(people).filter((p) => p.role === 'manager' && p.id !== managerId && !HIRES.some((h) => h.buddyId === p.id) && !(ooo[p.id] && now <= ooo[p.id].until))
+  return (pool.find((p) => p.id === 'lucius') ?? pool[0])?.id
 }
 
 function ownerRef(def: StepDef, h: HireState, ctx: DeriveCtx): { ref: Ref; away: boolean } {

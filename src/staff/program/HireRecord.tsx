@@ -1,5 +1,5 @@
 import { useShallow } from 'zustand/react/shallow'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ArrowLeft, CalendarClock, Lock, RotateCcw, TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn, lc } from '../../lib/cn'
@@ -24,7 +24,9 @@ export function HireRecord() {
   const now = useDemo((s) => s.now)
   const [tab, setTab] = useState(route.tab ?? 'next')
   const [full, setFull] = useState(false)
-  const [sel, setSel] = useState<string | null>(null)
+  const [sel, setSel] = useState<string | null>(route.step ?? null)
+  // Search can land on a specific step; show its evidence.
+  useEffect(() => { if (route.step) { setSel(route.step); setTab('evidence') } }, [route.step, route.hireId])
   const [showLater, setShowLater] = useState(false)
   const [openStages, setOpenStages] = useState<number[]>([])
   if (!v) return null

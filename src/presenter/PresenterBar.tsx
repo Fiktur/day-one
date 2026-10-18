@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, ChevronDown, Columns3, RotateCcw, Tag, Terminal, Volume2, VolumeX, X, Command as CommandIcon } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, Columns3, Inbox, RotateCcw, Tag, Terminal, Volume2, VolumeX, X, Command as CommandIcon } from 'lucide-react'
 import { Dropdown, DropItem } from '../ui/overlay'
 import { cn } from '../lib/cn'
 import { useDemo } from '../engine/store'
@@ -97,6 +97,7 @@ export function PresenterBar() {
         <span className="hidden min-[1100px]:block"><Segmented size="xs" value={s.split ? 'split' : 'single'} options={[['split', 'Split'], ['single', 'Single']] as const} onChange={(v) => s.setSplit(v === 'split')} /></span>
         <Segmented size="xs" value={s.setup} options={[['connected', 'Automatic'], ['manual', 'Manual updates']] as const} onChange={(v) => s.setSetup(v)} />
         <span className="hidden sm:contents">
+          <IconBtn on={s.outbox} label="Outbox: the pings Day One would send today  (O)" onClick={() => s.set({ outbox: !s.outbox })}><Inbox className="h-4 w-4" /></IconBtn>
           <IconBtn on={s.underHood} label="Under the hood: live event log  (U)" onClick={() => s.set({ underHood: !s.underHood })}><Terminal className="h-4 w-4" /></IconBtn>
           <IconBtn on={s.tags} label="Requirement tags from the brief  (T)" onClick={() => s.set({ tags: !s.tags })}><Tag className="h-4 w-4" /></IconBtn>
         </span>

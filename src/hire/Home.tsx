@@ -3,24 +3,24 @@ import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn, lc } from '../lib/cn'
 import { useNav } from '../nav/NavContext'
-import { useView } from '../engine/selectors'
+import { useCtx, useView } from '../engine/selectors'
 import { useDemo } from '../engine/store'
-import type { HireView } from '../engine/derive'
+import { managerFor, type HireView } from '../engine/derive'
 import { addBiz, fmtDay, fmtShort, fmtWeekdayShort, prevWeekday } from '../lib/dates'
 import { people } from '../data/people'
 import { PEPPER_VIDEO } from '../data/welcome'
-import { Button, Glyph, ReqTag } from '../ui/parts'
+import { Avatar, Button, Glyph, ReqTag } from '../ui/parts'
 import { VideoTile } from '../ui/video'
 import { Emoji, STEP_EMOJI, type EmojiName } from '../ui/assets'
 import { HoldButton } from '../ui/hold'
 import { AnimatePresence, Num, Tilt, motion, springs } from '../ui/motion'
 import { useCelebrate } from '../ui/fx'
-import { handledFor, hireTaskLabel, isOwnActionable, usePlan, type HandledItem } from './helpers'
+import { buddyOf, handledFor, hireTaskLabel, isOwnActionable, usePlan, type HandledItem } from './helpers'
 import { systemNames } from '../data/journey'
 
 const HANDLED_EMOJI: Record<string, EmojiName> = { bg: 'shield', permit: 'globe', laptop: 'laptop', account: 'key', seat: 'calendar' }
 
-export function HireHome() {
+export function HireHome({ wide }: { wide?: boolean }) {
   const { viewer, go } = useNav()
   const v = useView(viewer)
   const now = useDemo((s) => s.now)
@@ -52,8 +52,9 @@ export function HireHome() {
 
   if (started) return <StartedHome />
 
-  return (
-    <div className="space-y-3.5 px-4 pb-4">
+  // The same sections stack on a phone and sit in two columns on a desktop, so the two layouts never drift apart.
+  const left = (
+    <>
       <div className="pt-1">
         <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">Day One <ReqTag ids="E2" /></div>
         <h1 className="flex items-center gap-2 font-display text-[32px] font-extrabold leading-[1.02] tracking-[-0.02em]">
@@ -161,7 +162,10 @@ export function HireHome() {
           </motion.div>
         )}
       </AnimatePresence>
-
+    </>
+  )
+  const right = (
+    <>
       <div className="rounded-[22px] border border-line bg-surface p-3.5 shadow-card">
         <button type="button" aria-expanded={showHandled} onClick={() => setShowHandled(!showHandled)} className="flex w-full items-center gap-2 text-left">
           <span className="min-w-0 flex-1">
@@ -210,26 +214,58 @@ export function HireHome() {
           { name: 'firstweek', label: 'First week', emoji: 'calendar' },
           { name: 'people', label: 'Your people', emoji: 'people' },
           { name: 'company', label: 'Benefits', emoji: 'heart' },
-        ] as const).map((x) => (
+        ] as const).filter((x) => !(wide && x.name === 'people')).map((x) => (
           <motion.button key={x.name} whileTap={{ scale: 0.94 }} whileHover={{ y: -1.5 }} transition={springs.bouncy} type="button" onClick={() => go({ name: x.name })} className="flex items-center gap-1.5 rounded-full border border-line bg-surface py-1.5 pl-2 pr-3 text-[13px] font-semibold shadow-card">
             <Emoji name={x.emoji} size={20} />
             {x.label}
           </motion.button>
         ))}
       </div>
-    </div>
+    </>
+  )
+  if (wide) {
+    return (
+      <div className="grid grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] items-start gap-5 px-6 pb-8 pt-2">
+        <div className="space-y-3.5">{left}</div>
+        <div className="space-y-3.5"><YourPeople v={v} />{right}</div>
+      </div>
+    )
+  }
+  return <div className="space-y-3.5 px-4 pb-4">{left}{right}</div>
+}
+
+/** Desktop only: the people around the hire, one click from the full page. */
+function YourPeople({ v }: { v: HireView }) {
+  const { go } = useNav()
+  const ctx = useCtx()
+  const buddy = buddyOf(v)
+  const list = [{ id: managerFor(v.hire, ctx).id, role: 'Manager' }, ...(buddy ? [{ id: buddy, role: 'Buddy' }] : []), { id: 'maria', role: 'Onboarding team' }]
+  return (
+    <button type="button" onClick={() => go({ name: 'people' })} className="block w-full rounded-[22px] border border-line bg-surface p-3.5 text-left shadow-card">
+      <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.12em] text-faint">Your people</div>
+      <ul className="space-y-2">
+        {list.map((x) => <li key={x.id} className="flex items-center gap-2.5 text-[13px]"><Avatar id={x.id} size={30} /><span className="min-w-0"><span className="block truncate font-semibold">{people[x.id]?.name}</span><span className="block text-xs text-muted">{x.role}</span></span></li>)}
+      </ul>
+    </button>
   )
 }
 
 /** The first day, hour by hour, from the manager's plan, plus the first piece of work once it's chosen. */
 function FirstDay({ v, title }: { v: HireView; title: string }) {
-  const { plan, work, saved } = usePlan(v)
+  const { plan, work, saved, session } = usePlan(v)
+  const remote = session?.where === 'Video call'
   return (
     <div className="rounded-[22px] border border-accent/30 bg-surface p-3.5 shadow-card">
       <div className="mb-2 flex items-center justify-between"><span className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">{title}</span>{!saved && <span className="text-[11px] text-muted">Draft agenda</span>}</div>
       <ol className="space-y-1.5">
         {plan[0].map((x, i) => <li key={i} className="grid grid-cols-[58px_1fr] gap-2 text-[13px]"><span className="font-mono text-xs text-faint">{x.t}</span><span>{x.l}</span></li>)}
       </ol>
+      {session && (
+        <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted">
+          <span>{remote ? `Orientation link opens at 8:45, ${session.time.split('–')[0]}` : `${session.where}. Front desk from 8:45 for your badge.`}</span>
+          {remote && <Button size="xs" onClick={() => toast('Opens the orientation call in a new tab', { description: 'The same link is in your calendar invite.' })}>Join</Button>}
+        </div>
+      )}
       {work && (
         <div className="mt-2.5 flex items-center gap-2 rounded-xl bg-accent-soft px-3 py-2 text-[13px]">
           <Emoji name="target" size={20} />

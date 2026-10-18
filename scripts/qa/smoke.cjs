@@ -180,6 +180,50 @@ const check = (ok, msg) => { if (!ok) failures.push(msg); console.log(`${ok ? 'o
   const gone = await page.evaluate(async () => Object.values((await import('/src/engine/selectors.ts')).selectViews(window.__demo.getState())).find((v) => v.status === 'withdrawn')?.hire.id)
   check(!!gone && /We delete your personal details on/.test(await show(gone, { name: 'home' })), 'withdrawn hire is told when their details are deleted')
 
+  // ---- PR 3: notifications instead of logging in, desktop layout, search ----
+  await reset()
+  await page.evaluate(async () => (await import('/src/engine/scenarios.ts')).runScenario(3))
+  await page.waitForTimeout(1500)
+  await show('maria', { name: 'command' })
+  await page.keyboard.press('o')
+  await page.waitForTimeout(600)
+  const outbox = page.locator('aside[aria-label="Outbox"]')
+  check(/Chase Firstbase/.test(await outbox.innerText()), 'Outbox shows a Chase ping for the backordered laptop')
+  const take = outbox.getByRole('button', { name: 'Take it', exact: true }).first()
+  const claimsBefore = Object.keys((await state()).claims).length
+  if (await take.count()) { await take.click(); await page.waitForTimeout(400) }
+  check(Object.keys((await state()).claims).length === claimsBefore + 1, '"Take it" in a ping claims the step without opening the app')
+  await page.keyboard.press('o')
+
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await show('virgil', { name: 'home' })
+  await page.getByText('Desktop', { exact: true }).first().click()
+  await page.waitForTimeout(800)
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+  check(overflow <= 0 && /your people/i.test(await page.locator('body').innerText()), `desktop hire layout fits 1280px with two columns (overflow ${overflow}px)`)
+  await page.getByText('Phone', { exact: true }).first().click()
+  await page.setViewportSize({ width: 1600, height: 960 })
+
+  await page.keyboard.press('Control+k')
+  await page.waitForTimeout(300)
+  await page.keyboard.type('laptop')
+  await page.waitForTimeout(300)
+  const stepHits = await page.locator('[cmdk-group-heading]:has-text("Steps")').count()
+  await page.locator('[cmdk-group]:has([cmdk-group-heading]:has-text("Steps")) [cmdk-item]').first().click()
+  await page.waitForTimeout(500)
+  const landed = await page.evaluate(() => window.__demo.getState().main.route)
+  check(stepHits === 1 && !!landed.step, `⌘K "laptop" finds steps and opens one (${JSON.stringify(landed)})`)
+
+  await show('maria', { name: 'insights' })
+  await page.getByRole('button', { name: /^Assign to / }).first().click()
+  await page.waitForTimeout(300)
+  check((await page.evaluate(() => window.__demo.getState().assignments.length)) === 1, 'Insights suggestion can be assigned')
+
+  await show('diana', { name: 'startcheck' })
+  const propose = page.getByRole('button', { name: /^Propose / }).first()
+  if (await propose.count()) { await propose.click(); await page.waitForTimeout(300) }
+  check(await page.evaluate(() => window.__demo.getState().nudges.some((n) => n.key.startsWith('start:'))), 'a manager can propose the earliest safe start to Maria')
+
   // ---- All eight scenarios run without console errors ----
   await reset()
   for (const n of [1, 2, 3, 4, 5, 6, 7, 8]) {
