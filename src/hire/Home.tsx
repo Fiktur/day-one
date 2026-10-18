@@ -6,7 +6,7 @@ import { useNav } from '../nav/NavContext'
 import { useView } from '../engine/selectors'
 import { useDemo } from '../engine/store'
 import type { HireView } from '../engine/derive'
-import { addBiz, fmtDay, fmtShort, fmtWeekdayShort, rel } from '../lib/dates'
+import { addBiz, fmtDay, fmtShort, fmtWeekdayShort, prevWeekday } from '../lib/dates'
 import { people } from '../data/people'
 import { PEPPER_VIDEO } from '../data/welcome'
 import { Button, Glyph, ReqTag } from '../ui/parts'
@@ -15,7 +15,7 @@ import { Emoji, STEP_EMOJI, type EmojiName } from '../ui/assets'
 import { HoldButton } from '../ui/hold'
 import { AnimatePresence, Num, Tilt, motion, springs } from '../ui/motion'
 import { useCelebrate } from '../ui/fx'
-import { handledFor, hireTaskLabel, isOwnActionable, type HandledItem } from './helpers'
+import { handledFor, hireTaskLabel, isOwnActionable, usePlan, type HandledItem } from './helpers'
 import { systemNames } from '../data/journey'
 
 const HANDLED_EMOJI: Record<string, EmojiName> = { bg: 'shield', permit: 'globe', laptop: 'laptop', account: 'key', seat: 'calendar' }
@@ -84,13 +84,13 @@ export function HireHome() {
                 </div>
               )}
               <div className="mt-1 text-[13px] font-medium text-white/85">{blocked ? `Not ${fmtWeekdayShort(h.start)}. ${people.maria.name.split(' ')[0]} will be in touch.` : fmtWeekdayShort(h.start)}</div>
-              {mayMove && <div className="mt-1 text-[12px] text-white/85">Your start date may move. {people.maria.name.split(' ')[0]} will confirm it with you by {fmtShort(addBiz(now, 2))}.</div>}
+              {mayMove && <div className="mt-1 text-[12px] text-white/85">Your start date may move. {people.maria.name.split(' ')[0]} will confirm it with you by {fmtShort(Math.max(now, Math.min(addBiz(now, 2), prevWeekday(h.start - 1))))}.</div>}
             </div>
             <Ring pct={pct} label={<><Num value={doneCount} />/{own.length}</>} aria={`${doneCount} of ${own.length} of your tasks done`} />
           </div>
           <div className="relative mt-3 flex items-center gap-2 rounded-2xl bg-white/15 px-3 py-2 text-[12.5px] backdrop-blur">
             <span className="grid h-5 w-5 place-items-center rounded-full bg-white">
-              <Glyph state={anyRed ? 'late' : 'verified'} size={14} />
+              <Glyph state={anyRed ? 'late' : blocked || mayMove ? 'prog' : 'verified'} size={14} />
             </span>
             <span className="min-w-0 truncate font-medium">{anyRed ? 'One thing needs you today' : blocked ? 'We’ll confirm your new date with you' : mayMove ? (actionable.length ? 'Keep going. We’ll confirm your date.' : 'Nothing you need to do right now') : actionable.length ? (companySlow ? "You're on track. One thing is with us." : "You're on track. Nothing late.") : "You're all set for now"}</span>
           </div>
@@ -107,6 +107,9 @@ export function HireHome() {
           </div>
         </motion.div>
       )}
+
+      {blocked && <WhatHappensNow v={v} handled={handled} />}
+      {!blocked && !mayMove && days > 0 && days <= 3 && <FirstDay v={v} title={`Your first day · ${fmtWeekdayShort(h.start)}`} />}
 
       <AnimatePresence mode="popLayout" initial={false}>
         {next ? (
@@ -148,12 +151,12 @@ export function HireHome() {
               {next.red && <Button variant="ghost" onClick={() => go({ name: 'help' })}>Need a hand?</Button>}
             </div>
           </motion.div>
-        ) : (
+        ) : blocked || (!mayMove && days > 0 && days <= 3) ? null : (
           <motion.div key="none" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={springs.bouncy} className="flex items-center gap-3 rounded-[22px] border border-line bg-surface p-3.5 shadow-card">
             <Emoji name="party" size={40} float />
             <div>
-              <div className="font-semibold">Nothing needs you right now</div>
-              <div className="mt-0.5 text-xs text-muted">{nextOpen ? `Next: ${nextOpen.def.hire?.label ?? nextOpen.name}, ${rel(nextOpen.open!, now)}.` : 'We will let you know when something does.'}</div>
+              <div className="font-semibold">{nextOpen && !(mayMove && nextOpen.open! >= h.start) ? `Nothing until ${fmtWeekdayShort(nextOpen.open!)}` : 'Nothing needs you right now'}</div>
+              <div className="mt-0.5 text-xs text-muted">{mayMove ? 'We’ll tell you as soon as your start date is confirmed.' : nextOpen ? `Then: ${nextOpen.def.hire?.label ?? nextOpen.name}.` : 'We will let you know when something does.'}</div>
             </div>
           </motion.div>
         )}
@@ -214,6 +217,43 @@ export function HireHome() {
           </motion.button>
         ))}
       </div>
+    </div>
+  )
+}
+
+/** The first day, hour by hour, from the manager's plan, plus the first piece of work once it's chosen. */
+function FirstDay({ v, title }: { v: HireView; title: string }) {
+  const { plan, work, saved } = usePlan(v)
+  return (
+    <div className="rounded-[22px] border border-accent/30 bg-surface p-3.5 shadow-card">
+      <div className="mb-2 flex items-center justify-between"><span className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">{title}</span>{!saved && <span className="text-[11px] text-muted">Draft agenda</span>}</div>
+      <ol className="space-y-1.5">
+        {plan[0].map((x, i) => <li key={i} className="grid grid-cols-[58px_1fr] gap-2 text-[13px]"><span className="font-mono text-xs text-faint">{x.t}</span><span>{x.l}</span></li>)}
+      </ol>
+      {work && (
+        <div className="mt-2.5 flex items-center gap-2 rounded-xl bg-accent-soft px-3 py-2 text-[13px]">
+          <Emoji name="target" size={20} />
+          <span className="min-w-0 flex-1"><span className="block text-[11px] text-muted">Your first piece of work</span><span className="block truncate font-semibold">{work.title}</span></span>
+          {work.link && <a href={work.link} target="_blank" rel="noreferrer" className="shrink-0 text-xs font-semibold text-accent">Open</a>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** When the start date can't hold: what's still open, who decides the new date, and that nothing is on the hire. */
+function WhatHappensNow({ v, handled }: { v: HireView; handled: HandledItem[] }) {
+  const now = useDemo((s) => s.now)
+  const open = handled.filter((x) => x.glyph !== 'verified')
+  const mgr = people[v.hire.managerId]?.name.split(' ')[0]
+  return (
+    <div className="rounded-[22px] border border-line bg-surface p-3.5 shadow-card">
+      <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.12em] text-faint">What happens now</div>
+      <ol className="space-y-2 text-[13px]">
+        {open.map((x) => <li key={x.key} className="flex gap-2"><Glyph state={x.glyph} size={14} className="mt-0.5" /><span><span className="font-semibold">{x.label}:</span> <span className="text-muted">{x.text}</span></span></li>)}
+        <li className="flex gap-2"><Glyph state="prog" size={14} className="mt-0.5" /><span><span className="font-semibold">New date:</span> <span className="text-muted">Maria Hill agrees it with {mgr} and tells you by {fmtShort(addBiz(now, 2))}.</span></span></li>
+        <li className="flex gap-2"><Glyph state="verified" size={14} className="mt-0.5" /><span className="text-muted">Your laptop, account and orientation seat move with the date. Nothing for you to do.</span></li>
+      </ol>
     </div>
   )
 }
@@ -310,6 +350,7 @@ function StartedHome() {
         <h1 className="flex items-center gap-2 font-display text-[30px] font-extrabold leading-[1.05] tracking-[-0.02em]">{now === v.hire.start ? 'Welcome aboard' : 'Welcome back'}, {v.person.name.split(' ')[0]} <Emoji name="sunrise" size={32} float /></h1>
         <p className="mt-1 text-[13px] text-muted">{now === v.hire.start ? 'Today is your first day.' : `You started ${fmtDay(v.hire.start)}.`} Here's what's next on your ramp.</p>
       </div>
+      {now === v.hire.start && <FirstDay v={v} title="Today" />}
       <Tilt max={4}>
         <div className="relative overflow-hidden rounded-[26px] btn-gradient p-4 text-white shadow-glow">
           <div className="flex items-center justify-between gap-3">

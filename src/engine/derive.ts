@@ -60,7 +60,7 @@ export interface DeriveCtx {
   now: number
   setup: Setup
   down: Partial<Record<SystemId, number>>
-  ooo: Record<string, { until: number; delegate: string | null }>
+  ooo: Record<string, { until: number; delegate: string | null; since?: number }>
   forced: Forced[]
 }
 
@@ -216,6 +216,9 @@ export function deriveHire(h: HireState, ctx: DeriveCtx): HireView {
       holder = confirmer
       heldSince = s.doneRecorded ?? s.done
     }
+    // After a hand-over the cover has only held it since the hand-over, not since it opened.
+    const cover = ctx.ooo[h.managerId]
+    if (holder?.kind === 'person' && cover?.delegate === holder.id && cover.since != null && heldSince != null) heldSince = Math.max(heldSince, cover.since)
     const red = RED.includes(state) || (state === 'confirming' && confirmSlow) || (away && holder?.id === h.managerId && state !== 'blank')
 
     return { ...s, name, state, red, owner, confirmer, holder, heldSince, mode, label, waitingOn, ownerAway: away, confirmSlow }

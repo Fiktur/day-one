@@ -1,12 +1,16 @@
 import { useId, useState, type ReactNode } from 'react'
 import { Bell, Bot, ChevronDown, LayoutDashboard, Search, Users, Mail, CalendarRange, Heart, GitBranch, LineChart, ListTodo, Server, CalendarCheck, UserCog, ClipboardList } from 'lucide-react'
-import { cn } from '../lib/cn'
+import { cn, lc } from '../lib/cn'
 import { useNav } from '../nav/NavContext'
 import { useDemo } from '../engine/store'
-import { useViews } from '../engine/selectors'
-import { people, personRoleLabel, switcherGroups } from '../data/people'
+import { ctxOf, useViews } from '../engine/selectors'
+import { people, personRoleLabel, switcherGroups, teams } from '../data/people'
 import { countMoves, queueFor } from '../engine/queues'
-import { safeName } from '../engine/derive'
+import { managerFor, safeName } from '../engine/derive'
+import { FixButton, fixFor } from './program/fixes'
+import { prepActionFor } from './manager/PrepActions'
+import { StepActions } from '../ui/StepRow'
+import { systemNames } from '../data/journey'
 import { Avatar, Glyph, Kbd } from '../ui/parts'
 import { PageTransition, motion, springs, Num } from '../ui/motion'
 import { Emoji } from '../ui/assets'
@@ -134,38 +138,78 @@ export function RoleSwitcher({ compact }: { compact?: boolean }) {
 function Notifications() {
   const { viewer, go } = useNav()
   const views = useViews()
-  const now = useDemo((s) => s.now)
+  const st = useDemo()
+  const now = st.now
   const p = people[viewer]
   const who = p.role === 'team' || p.role === 'program' ? { team: p.team } : { person: viewer }
   const overseer = p.role === 'program' || p.role === 'head'
   const q = queueFor(views, who, now)
+  const ctx = ctxOf(st)
   const late = Object.values(views).flatMap((v) => v.balls.filter((b) => b.red).map((step) => ({ view: v, step })))
-  const list = overseer && q.move.length === 0 ? late : q.move
-  const items = list.slice(0, 6)
-  const red = list.filter((x) => x.step.red).length
+  const todo = overseer && q.move.length === 0 ? late : [...q.move, ...q.vendor.filter((x) => x.step.red)]
+  // A nudge names a team or a person; either way it lands here as a flag on the item.
+  const names = [p.name, p.team ? teams[p.team].name : '']
+  const nudgedBy = (hireId: string, key: string) => st.nudges.find((n) => n.hireId === hireId && n.key === key && names.includes(n.to))?.by
+  const fyi: { key: string; hireId?: string; text: string }[] = [
+    ...(overseer ? (Object.keys(st.down) as (keyof typeof st.down)[]).map((sys) => ({ key: `down:${sys}`, text: `${systemNames[sys!]} isn't responding. Hires see "updates are delayed".` })) : []),
+    ...(p.role === 'manager' ? Object.values(views).filter((v) => managerFor(v.hire, ctx).id === viewer || v.hire.managerId === viewer).flatMap((v) =>
+      v.status === 'withdrawn' ? [{ key: `w:${v.hire.id}`, hireId: v.hire.id, text: `${v.person.name} withdrew. Nothing needed from you.` }]
+        : v.status === 'atrisk' && v.primary?.holder && !(v.primary.holder.kind === 'person' && v.primary.holder.id === viewer) ? [{ key: `r:${v.hire.id}`, hireId: v.hire.id, text: `${v.person.name}'s start date is at risk. Maria Hill is on it.` }] : []) : []),
+    ...q.vendor.filter((x) => !x.step.red).slice(0, 3).map((x) => ({ key: `v:${x.view.hire.id}:${x.step.key}`, hireId: x.view.hire.id, text: `${x.view.person.name.split(' ')[0]} · ${safeName(x.step, { role: p.role, team: p.team })}: with ${x.step.holder?.name}, ${lc(x.step.label)}` })),
+  ]
+  const groups = Array.from(new Set(todo.map((x) => x.view.hire.id))).map((id) => ({ v: views[id], items: todo.filter((x) => x.view.hire.id === id) }))
+  const red = todo.filter((x) => x.step.red).length
   return (
     <Popover
       align="end"
-      className="w-80 p-0"
+      className="w-[360px] p-0"
       trigger={
         <button type="button" aria-label="Notifications" className="relative grid h-8 w-8 place-items-center rounded-lg text-muted hover:bg-sunken hover:text-ink">
           <Bell className="h-4 w-4" />
-          {list.length > 0 && <span className={cn('absolute right-1 top-1 h-2 w-2 rounded-full ring-2 ring-surface', red ? 'bg-red' : 'bg-amber')} />}
+          {(todo.length > 0 || fyi.length > 0) && <span className={cn('absolute right-1 top-1 h-2 w-2 rounded-full ring-2 ring-surface', red ? 'bg-red' : todo.length ? 'bg-amber' : 'bg-accent')} />}
         </button>
       }
     >
-      <div className="border-b border-line px-3 py-2 text-[13px] font-semibold">{overseer && q.move.length === 0 ? 'Needs attention across all hires' : "It's your turn"}</div>
-      <div className="max-h-80 overflow-y-auto p-1">
-        {items.length === 0 && <div className="px-3 py-4 text-center text-[13px] text-muted"><Emoji name="party" size={30} float className="mx-auto mb-1" />Nothing waiting on you.</div>}
-        {items.map((x) => (
-          <button key={x.view.hire.id + x.step.key} type="button" onClick={() => go({ name: p.role === 'manager' ? 'hire' : 'hire', hireId: x.view.hire.id })} className="grid w-full grid-cols-[14px_1fr] gap-2 rounded-lg px-2 py-2 text-left hover:bg-sunken">
-            <Glyph state={x.step.red ? 'late' : 'open'} className="mt-0.5" />
-            <span className="min-w-0 text-[13px]">
-              <span className="font-medium">{safeName(x.step, { role: p.role, team: p.team }, { action: true })}</span> for {x.view.person.name}
-              <span className={cn('block text-xs', x.step.red ? 'text-red' : 'text-muted')}>{x.step.label}</span>
-            </span>
-          </button>
-        ))}
+      <div className="max-h-[420px] overflow-y-auto">
+        <div className="border-b border-line px-3 py-2 text-[13px] font-semibold">{overseer && q.move.length === 0 ? 'Needs attention across all hires' : 'To do'} <span className="font-normal text-muted">· {todo.length}</span></div>
+        <div className="p-1">
+          {todo.length === 0 && <div className="px-3 py-4 text-center text-[13px] text-muted"><Emoji name="party" size={30} float className="mx-auto mb-1" />Nothing waiting on you.</div>}
+          {groups.map(({ v, items }) => {
+            // Several steps stuck for one reason get one button, on the first of them.
+            const seen = new Set<string>()
+            return (
+            <div key={v.hire.id} className="rounded-lg px-2 py-1.5">
+              <button type="button" onClick={() => go({ name: 'hire', hireId: v.hire.id })} className="flex items-center gap-1.5 text-xs font-semibold hover:text-accent"><Avatar id={v.hire.id} size={18} />{v.person.name}</button>
+              {items.map(({ step }) => {
+                const by = nudgedBy(v.hire.id, step.key)
+                const fix = fixFor(v, step, st, viewer)
+                const dup = !!fix && seen.has(fix.label)
+                if (fix) seen.add(fix.label)
+                return (
+                  <div key={step.key} className="mt-1 flex items-center gap-2 pl-6">
+                    <Glyph state={step.red ? 'late' : 'open'} size={10} />
+                    <span className="min-w-0 flex-1 text-[13px]">
+                      <span className="block truncate font-medium">{safeName(step, { role: p.role, team: p.team }, { action: true })}</span>
+                      <span className={cn('block truncate text-xs', step.red ? 'text-red' : 'text-muted')}>{by ? `Nudged by ${people[by]?.name.split(' ')[0]} · ` : ''}{step.label}</span>
+                    </span>
+                    {overseer || step.holder?.kind === 'provider' ? (!dup && <FixButton v={v} s={step} />) : (prepActionFor(v, step) ?? <StepActions view={v} step={step} compact />)}
+                  </div>
+                )
+              })}
+            </div>
+            )
+          })}
+        </div>
+        {fyi.length > 0 && (
+          <>
+            <div className="border-y border-line bg-bg/60 px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider text-faint">FYI</div>
+            <ul className="p-1">
+              {fyi.map((f) => (
+                <li key={f.key}><button type="button" onClick={() => f.hireId ? go({ name: 'hire', hireId: f.hireId }) : go({ name: 'systems' })} className="w-full rounded-lg px-2.5 py-1.5 text-left text-xs text-muted hover:bg-sunken hover:text-ink">{f.text}</button></li>
+              ))}
+            </ul>
+          </>
+        )}
       </div>
     </Popover>
   )

@@ -28,6 +28,14 @@ export function Cohorts() {
   const taken = (x: Session) => attendees(x).length + (EXTRA_ATTENDEES[x.id] ?? 0)
   const sentFor = useDemo((st) => st.invitesSentFor)
   const sent = (x: Session) => (x.invitesSent != null && x.invitesSent <= now) || sentFor[x.id] != null
+  const speakers = useDemo((st) => st.speakers)
+  const confirmed = (x: Session, r: Session['run'][number]) => r.confirmed || speakers.includes(`${x.id}:${r.time}`)
+  // Invites go out 14 days before; a session needs Maria when they're due, a speaker is unconfirmed, or it's full.
+  const needs = (x: Session) => [
+    !sent(x) && now >= x.day - 14 && 'Invites due',
+    x.run.some((r) => !confirmed(x, r)) && 'Speaker to confirm',
+    taken(x) >= x.seats && 'Full',
+  ].filter(Boolean) as string[]
 
   return (
     <Page>
@@ -39,7 +47,7 @@ export function Cohorts() {
             const full = t >= x.seats
             return (
               <button key={x.id} type="button" onClick={() => setSel(x.id)} className={cn('w-full rounded-xl border bg-surface p-3 text-left shadow-card', sel === x.id ? 'border-accent ring-1 ring-accent' : 'border-line')}>
-                <div className="flex items-baseline justify-between"><span className="font-semibold">{fmtDay(x.day)}</span>{full && <Pill tone="red">Full</Pill>}</div>
+                <div className="flex items-baseline justify-between gap-2"><span className="font-semibold">{fmtDay(x.day)}</span>{needs(x).length > 0 && <Pill tone={full ? 'red' : 'amber'}>{needs(x)[0]}{needs(x).length > 1 ? ` +${needs(x).length - 1}` : ''}</Pill>}</div>
                 <div className="text-xs text-muted">{x.group}</div>
                 <div className="mt-2 h-1.5 rounded-full bg-sunken"><div className={cn('h-full rounded-full', full ? 'bg-red' : 'bg-accent')} style={{ width: `${Math.min(100, (t / x.seats) * 100)}%` }} /></div>
                 <div className="mt-1 text-[11px] text-muted tnum">{t} of {x.seats} seats</div>
@@ -56,8 +64,8 @@ export function Cohorts() {
                 <p className="text-[13px] text-muted">{fmtDay(s.day)} · {s.time} · {s.where} · host {people[s.host]?.name}</p>
               </div>
               <div className="flex gap-2">
-                <Button onClick={() => toast.success('Reminder sent to people who haven’t replied')}>Remind</Button>
-                <Button variant="primary" onClick={(e) => {
+                {sent(s) && <Button onClick={() => toast.success('Reminder sent to people who haven’t replied')}>Remind</Button>}
+                <Button variant={sent(s) ? 'ghost' : 'primary'} onClick={(e) => {
                   const st = useDemo.getState()
                   const resend = sent(s)
                   st.set({ invitesSentFor: { ...st.invitesSentFor, [s.id]: now } })
@@ -73,10 +81,11 @@ export function Cohorts() {
               <h3 className="mb-2 font-semibold">Run of show</h3>
               <ol className="space-y-1">
                 {s.run.map((r) => (
-                  <li key={r.time + r.title} className={cn('grid grid-cols-[14px_48px_1fr] items-center gap-2.5 rounded-lg px-2 py-1.5 text-[13px]', !r.confirmed && 'bg-amber-soft')}>
-                    <Glyph state={r.confirmed ? 'verified' : 'open'} size={12} />
+                  <li key={r.time + r.title} className={cn('grid grid-cols-[14px_48px_1fr_auto] items-center gap-2.5 rounded-lg px-2 py-1.5 text-[13px]', !confirmed(s, r) && 'bg-amber-soft')}>
+                    <Glyph state={confirmed(s, r) ? 'verified' : 'open'} size={12} />
                     <span className="font-mono text-xs text-muted">{r.time}</span>
-                    <span className="min-w-0"><span className="block truncate">{r.title}</span><span className="block truncate text-xs text-muted">{r.who}{r.confirmed ? '' : ' · speaker not confirmed'}</span></span>
+                    <span className="min-w-0"><span className="block truncate">{r.title}</span><span className="block truncate text-xs text-muted">{r.who}{confirmed(s, r) ? '' : ' · speaker not confirmed'}</span></span>
+                    {!confirmed(s, r) && <Button size="xs" variant="primary" onClick={(e) => { burst('small', e.currentTarget); const st = useDemo.getState(); st.set({ speakers: [...st.speakers, `${s.id}:${r.time}`] }); toast.success(`${r.who} confirmed for ${r.title}`, { description: `${fmtShort(s.day)} · ${s.group}` }) }}>Confirm speaker</Button>}
                   </li>
                 ))}
               </ol>

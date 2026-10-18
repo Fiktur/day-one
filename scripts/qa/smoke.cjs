@@ -120,6 +120,66 @@ const check = (ok, msg) => { if (!ok) failures.push(msg); console.log(`${ok ? 'o
   await page.waitForTimeout(600)
   check(await page.locator('[data-sonner-toast]').count() === 1, 'reset clears old toasts')
 
+  // ---- PR 2: every stated problem has its button ----
+  const state = () => page.evaluate(() => { const s = window.__demo.getState(); return { buddies: s.buddies, claims: s.claims, nudges: s.nudges.length, plans: Object.keys(s.plans), log: s.log.slice(0, 5).map((l) => l.event) } })
+  const views = (fn) => page.evaluate(async (src) => {
+    const sel = await import('/src/engine/selectors.ts')
+    const msg = await import('/src/engine/messages.ts')
+    const st = window.__demo.getState()
+    return new Function('views', 'messagesFor', 'ctx', `return (${src})(views, messagesFor, ctx)`)(sel.selectViews(st), msg.messagesFor, sel.ctxOf(st))
+  }, fn.toString())
+
+  await reset()
+  await show('tony', { name: 'myhires' })
+  await page.getByRole('button', { name: 'Pick a buddy', exact: true }).first().click()
+  await page.waitForTimeout(300)
+  await page.getByRole('button', { name: /Pick$/ }).first().click()
+  await page.waitForTimeout(600)
+  const picked = await state()
+  const hireWithBuddy = Object.keys(picked.buddies)[0]
+  const buddyMsg = hireWithBuddy && await views(new Function('id', `return (views, messagesFor, ctx) => { const v = views['${hireWithBuddy}']; const m = messagesFor(v, ctx, {}).find((x) => x.template.id === 'buddy'); return { step: v.by.buddy.state, status: m.status, fromId: m.fromId } }`)())
+  check(!!buddyMsg && buddyMsg.step === 'verified' && buddyMsg.fromId === picked.buddies[hireWithBuddy] && buddyMsg.status !== 'waiting', `buddy picker records the buddy and schedules their message (${JSON.stringify(buddyMsg)})`)
+
+  await page.evaluate(() => window.__demo.getState().setNow(20))
+  await show('tony', { name: 'hire', hireId: 'virgil' })
+  const plan = page.getByRole('button', { name: 'Write the plan', exact: true })
+  if (await plan.count()) { await plan.click(); await page.waitForTimeout(300); await page.getByRole('button', { name: 'Save plan' }).click(); await page.waitForTimeout(400) }
+  check((await state()).plans.includes('virgil'), 'first-week plan saves and completes the step')
+  const fw = await show('virgil', { name: 'firstweek' })
+  check(/First 1:1 with Tony/.test(fw), "the hire's First week page shows the plan")
+
+  await reset()
+  await show('shuri', { name: 'queue' })
+  await page.getByRole('button', { name: 'Take it', exact: true }).first().click()
+  await page.waitForTimeout(300)
+  check(Object.values((await state()).claims).includes('shuri'), '"Take it" claims a team step')
+
+  await show('maria', { name: 'hire', hireId: 'hal' })
+  const nudge = page.getByRole('button', { name: /^Nudge / }).first()
+  const before = (await state()).nudges
+  if (await nudge.count()) { await nudge.click(); await page.waitForTimeout(300) }
+  const after = await state()
+  check(after.nudges === before + 1 && after.log.includes('nudge.sent'), 'Nudge from the hire record lands in the log')
+
+  await page.evaluate(async () => (await import('/src/engine/scenarios.ts')).runScenario(3))
+  await page.waitForTimeout(1500)
+  const lane = await show('shuri', { name: 'queue' })
+  check(/Waiting on your vendor/.test(lane) && /Chase Firstbase/.test(lane), "IT's queue shows Hal's backorder in the vendor lane with Chase")
+
+  await reset()
+  await page.evaluate(async () => (await import('/src/engine/scenarios.ts')).runScenario(5))
+  await page.waitForTimeout(1500)
+  const cmd = await show('maria', { name: 'command' })
+  check(/isn't responding/.test(cmd) && /Notify \d manager/.test(cmd), 'Command center shows an incident card with Notify while Checkr is down')
+  const rec = await show('maria', { name: 'hire', hireId: 'virgil' })
+  check(/What’s next/.test(rec), 'hire record opens on "What’s next"')
+
+  await reset()
+  await page.evaluate(async () => (await import('/src/engine/scenarios.ts')).runScenario(7))
+  await page.waitForTimeout(1500)
+  const gone = await page.evaluate(async () => Object.values((await import('/src/engine/selectors.ts')).selectViews(window.__demo.getState())).find((v) => v.status === 'withdrawn')?.hire.id)
+  check(!!gone && /We delete your personal details on/.test(await show(gone, { name: 'home' })), 'withdrawn hire is told when their details are deleted')
+
   // ---- All eight scenarios run without console errors ----
   await reset()
   for (const n of [1, 2, 3, 4, 5, 6, 7, 8]) {

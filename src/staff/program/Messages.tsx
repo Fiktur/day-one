@@ -8,7 +8,10 @@ import { messagesFor, type MsgInstance } from '../../engine/messages'
 import { MSG_TEMPLATES } from '../../data/messages'
 import { people } from '../../data/people'
 import { fmtDay, fmtShort, isWeekend, nextWeekday, wdName } from '../../lib/dates'
-import { Avatar, Card, Pill, ReqTag, Chip } from '../../ui/parts'
+import { Avatar, Button, Card, Pill, ReqTag, Chip } from '../../ui/parts'
+import { toast } from 'sonner'
+import { managerFor } from '../../engine/derive'
+import { FixButton, fixFor } from './fixes'
 import { Page, PageHeader } from '../StaffShell'
 import { MsgStatusPill } from './HireRecord'
 import { Segmented } from '../../ui/motion'
@@ -26,7 +29,7 @@ export function Messages() {
   const ctx = useCtx()
   const edits = useDemo((s) => s.msgEdits)
   const flashes = useDemo((s) => s.flashes)
-  const [tab, setTab] = useState<'timeline' | 'templates'>('timeline')
+  const [tab, setTab] = useState<'needs' | 'timeline' | 'templates'>(route.hireId ? 'timeline' : 'needs')
   const [hire, setHire] = useState<string | 'all'>(route.hireId ?? 'all')
   const all = useMemo(() => Object.values(views).flatMap((v) => messagesFor(v, ctx, edits)), [views, ctx, edits])
   const [selKey, setSelKey] = useState<string | null>(null)
@@ -45,10 +48,12 @@ export function Messages() {
         sub="Every message to every hire, on one timeline. It re-plans when dates move and stops when someone withdraws."
         tags={<ReqTag ids="M3 M4 O8" />}
         right={
-          <Segmented value={tab} onChange={setTab} options={[['timeline', 'Timeline'], ['templates', 'Templates']] as const} />
+          <Segmented value={tab} onChange={setTab} options={[['needs', 'Needs you'], ['timeline', 'Timeline'], ['templates', 'Templates']] as const} />
         }
       />
-      {tab === 'templates' ? (
+      {tab === 'needs' ? (
+        <NeedsYou all={all} onOpen={(m) => { setTab('timeline'); setHire(m.hireId); setSelKey(m.key) }} />
+      ) : tab === 'templates' ? (
         <Card className="divide-y divide-line">
           {MSG_TEMPLATES.map((t) => (
             <div key={t.id} className="grid gap-2 px-4 py-3 md:grid-cols-[1.2fr_1fr_1.4fr]">
@@ -104,6 +109,50 @@ export function Messages() {
         </>
       )}
     </Page>
+  )
+}
+
+/** Only the messages a person has to look at; everything else sends on its own. */
+function NeedsYou({ all, onOpen }: { all: MsgInstance[]; onOpen: (m: MsgInstance) => void }) {
+  const { viewer } = useNav()
+  const views = useViews()
+  const st = useDemo()
+  const ctx = ctxOf(st)
+  const [reviewed, setReviewed] = useState<string[]>([])
+  const now = st.now
+  const items = all.flatMap((m) => {
+    const v = views[m.hireId]
+    if (v.status === 'withdrawn' || reviewed.includes(m.key)) return []
+    if (m.status === 'scheduled' && m.movedFrom != null) return [{ m, why: `Moved from ${fmtShort(m.movedFrom)} to ${fmtShort(m.day!)} after a date change. Check the wording still fits.`, action: <Button size="xs" onClick={() => { setReviewed([...reviewed, m.key]); toast.success('Marked as reviewed', { description: m.subject }) }}>Looks right</Button> }]
+    if (m.status === 'waiting' && m.template.from === 'buddy' && v.hire.start - now <= 14) {
+      const mgr = managerFor(v.hire, ctx).id
+      const asked = st.nudges.some((n) => n.hireId === m.hireId && n.key === 'buddy')
+      // Same rule as everywhere else: an absent manager gets "Reassign", not a nudge they won't read.
+      const action = fixFor(v, v.by.buddy, st, viewer)
+        ? <FixButton v={v} s={v.by.buddy} />
+        : <Button size="xs" variant="primary" disabled={asked} onClick={() => { st.nudge(m.hireId, 'buddy', people[mgr].name, viewer); toast.success(`Nudge sent to ${people[mgr].name}`, { description: 'With a link to the buddy picker.' }) }}>{asked ? 'Nudged today' : `Nudge ${people[mgr].name.split(' ')[0]}`}</Button>
+      return [{ m, why: `Waiting on ${people[mgr].name.split(' ')[0]} to pick a buddy${v.by.buddy?.ownerAway ? `, who is out of office` : ''}. It should go out ${fmtShort(v.hire.start - 5)}.`, action }]
+    }
+    return []
+  })
+  const auto = all.filter((m) => m.status === 'scheduled' && m.day != null && m.day <= now + 7).length
+  return (
+    <div className="space-y-3">
+      <Card className="divide-y divide-line">
+        {items.length === 0 && <div className="px-4 py-6 text-center text-[13px] text-muted">Nothing needs you. Every message is on schedule.</div>}
+        {items.map(({ m, why, action }) => (
+          <div key={m.key} className="flex flex-wrap items-center gap-3 px-4 py-3">
+            <Avatar id={m.hireId} size={28} />
+            <button type="button" onClick={() => onOpen(m)} className="min-w-0 flex-1 text-left">
+              <span className="block truncate text-[13px] font-medium">{m.subject} <span className="font-normal text-muted">· {people[m.hireId].name}</span></span>
+              <span className="block text-xs text-muted">{why}</span>
+            </button>
+            {action}
+          </div>
+        ))}
+      </Card>
+      <p className="px-1 text-xs text-muted">{auto} automated message{auto === 1 ? '' : 's'} go out in the next 7 days on their own. See them on the Timeline.</p>
+    </div>
   )
 }
 

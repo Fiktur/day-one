@@ -60,6 +60,8 @@ function BoardBuilder({ hireId, compact }: { hireId: string; compact: boolean })
   const suggestions = s.memory.filter((m) => m.template === board.template && !onBoard.has(m.text)).sort((a, b) => b.seenOn.length - a.seenOn.length)
   const msg = messagesFor(v, { now: s.now, setup: s.setup, down: s.down, ooo: s.ooo, forced: s.forced }, s.msgEdits).find((m) => m.template.id === 'manager_welcome')
 
+  // A board without the manager's own hello feels empty, so sharing waits for it.
+  const hasHello = v.by.hello?.state === 'verified' || board.posts.some((p) => p.kind === 'video' && p.section === 'manager')
   const ensureBoard = () => {
     if (!s.boards[hireId]) s.set({ boards: { ...s.boards, [hireId]: board } })
   }
@@ -78,7 +80,9 @@ function BoardBuilder({ hireId, compact }: { hireId: string; compact: boolean })
             </div>
             <div className="flex gap-2">
               <Button onClick={() => setPreview(true)}><Eye className="h-3.5 w-3.5" />Preview as {first}</Button>
-              {board.status !== 'live' && <Button variant="primary" onClick={(e) => { burst('hearts', e.currentTarget); window.setTimeout(() => burst('big'), 250); ensureBoard(); s.shareBoard(hireId, viewer) }}><Send className="h-3.5 w-3.5" />Share with {first}</Button>}
+              {board.status !== 'live' && (hasHello
+                ? <Button variant="primary" onClick={(e) => { burst('hearts', e.currentTarget); window.setTimeout(() => burst('big'), 250); ensureBoard(); s.shareBoard(hireId, viewer) }}><Send className="h-3.5 w-3.5" />Share with {first}</Button>
+                : <Button variant="primary" onClick={() => setRecording(true)}>Record your hello first</Button>)}
             </div>
           </div>
         </Card>

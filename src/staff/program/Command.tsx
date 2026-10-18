@@ -12,6 +12,8 @@ import { isMine } from '../../ui/StepRow'
 import { Page, PageHeader } from '../StaffShell'
 import { AnimatePresence, LayoutGroup, Num, Reveal, Segmented, Tilt, motion, springs } from '../../ui/motion'
 import { Emoji, type EmojiName } from '../../ui/assets'
+import { FixButton } from './fixes'
+import { IncidentCards } from './Incident'
 
 type ViewMode = 'list' | 'board' | 'calendar'
 type Filter = 'all' | 'attention' | 'unknown' | 'confirming' | number
@@ -49,6 +51,7 @@ export function Command() {
           <Segmented value={mode} onChange={setMode} options={[['list', 'List'], ['board', 'Board'], ['calendar', 'Calendar']] as const} />
         }
       />
+      <IncidentCards />
       <div className={cn('mb-4 grid gap-3', compact ? 'grid-cols-2' : 'grid-cols-5')}>
         {startA != null && <Stat i={0} emoji="calendar" label={`Starting ${fmtShort(startA)}`} value={count(startA)} on={only === startA} onClick={() => toggle(startA)} />}
         {startB != null && <Stat i={1} emoji="rocket" label={`Starting ${fmtShort(startB)}`} value={count(startB)} on={only === startB} onClick={() => toggle(startB)} />}
@@ -67,8 +70,8 @@ export function Command() {
       {mode === 'list' && (
         <Card className="overflow-hidden">
           {!compact && (
-            <div className="grid grid-cols-[minmax(0,1.3fr)_64px_96px_minmax(0,1fr)_minmax(0,1.6fr)_96px] gap-3 border-b border-line bg-bg px-4 py-2 font-mono text-[10px] uppercase tracking-wider text-faint">
-              <span>Hire</span><span>Starts</span><span>Stage</span><span>Waiting on</span><span>Next step</span><span>Status</span>
+            <div className="grid grid-cols-[minmax(0,1.3fr)_64px_88px_minmax(0,1fr)_minmax(0,1.6fr)_116px_104px] gap-3 border-b border-line bg-bg px-4 py-2 font-mono text-[10px] uppercase tracking-wider text-faint">
+              <span>Hire</span><span>Starts</span><span>Stage</span><span>Waiting on</span><span>Next step</span><span>Status</span><span className="sr-only">Action</span>
             </div>
           )}
           <AnimatePresence initial={false}>
@@ -149,11 +152,12 @@ function HireRow({ v, compact, onOpen }: { v: HireView; compact: boolean; onOpen
     )
   }
   return (
-    <button type="button" onClick={onOpen} className={cn('grid w-full grid-cols-[minmax(0,1.3fr)_64px_96px_minmax(0,1fr)_minmax(0,1.6fr)_96px] items-center gap-3 border-b border-line px-4 py-2.5 text-left last:border-0 hover:bg-bg', tint, flash && 'animate-flash')}>
-      <span className="flex min-w-0 items-center gap-2.5">
+    // The row opens the record on click; the name is the keyboard-reachable link, so the fix button never nests inside another button.
+    <div onClick={onOpen} className={cn('grid w-full cursor-pointer grid-cols-[minmax(0,1.3fr)_64px_88px_minmax(0,1fr)_minmax(0,1.6fr)_116px_104px] items-center gap-3 border-b border-line px-4 py-2.5 text-left last:border-0 hover:bg-bg', tint, flash && 'animate-flash')}>
+      <button type="button" onClick={(e) => { e.stopPropagation(); onOpen() }} className="flex min-w-0 items-center gap-2.5 text-left">
         <Avatar id={v.hire.id} size={28} />
         <span className="min-w-0"><span className="block truncate text-[13px] font-medium">{v.person.name}</span><span className="block truncate text-xs text-muted">{v.hire.title} · {groupFor(v.hire)}</span></span>
-      </span>
+      </button>
       <span className="text-[13px] tnum">{v.status === 'withdrawn' ? '—' : fmtShort(v.hire.start)}{v.dateMoved && <span className="block text-[10px] text-muted">moved</span>}</span>
       <span><StageTrack stage={v.stage} width={88} /><span className="mt-1 block truncate text-[10px] text-faint">{STAGES[v.stage]}</span></span>
       <span className="min-w-0">{p?.holder ? <BallChip step={p} now={now} size="sm" /> : <span className="text-xs text-faint">—</span>}</span>
@@ -168,7 +172,9 @@ function HireRow({ v, compact, onOpen }: { v: HireView; compact: boolean; onOpen
         <StatusPill status={v.status} />
         {v.dateMoved && v.status !== 'withdrawn' && <Pill tone="amber" className="text-[10px]">Date moved</Pill>}
       </span>
-    </button>
+      {/* An outage gets one incident card above the list, not a button on every row. */}
+      <span className="flex justify-end">{p?.state !== 'unknown' && <FixButton v={v} s={p} variant="secondary" />}</span>
+    </div>
   )
 }
 

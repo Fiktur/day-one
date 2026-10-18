@@ -1,8 +1,11 @@
-import type { HireView, StepView } from '../engine/derive'
+import { managerFor, type HireView, type StepView } from '../engine/derive'
 import type { GlyphState } from '../ui/parts'
 import { addBiz, fmtDay, fmtShort, rel } from '../lib/dates'
 import { systemNames } from '../data/journey'
 import { people } from '../data/people'
+import { useDemo, type PlanDay } from '../engine/store'
+import { useCtx } from '../engine/selectors'
+import { SESSIONS, groupFor } from '../data/cohorts'
 
 export interface HandledItem {
   key: string
@@ -79,6 +82,37 @@ export function handledFor(v: HireView, now: number, laptopModel?: string): Hand
   if (seat) out.push({ key: 'seat', label: 'Orientation seat', glyph: seat.state === 'verified' ? 'verified' : 'prog', text: seat.state === 'verified' ? `Saved for ${fmtDay(v.hire.start)}` : 'Being booked', flashKeys: ['cohort_seat'] })
 
   return out
+}
+
+/** The buddy, once the manager has really picked one. */
+export function buddyOf(v: HireView): string | null {
+  return v.hire.buddyId && v.by.buddy?.state === 'verified' ? v.hire.buddyId : null
+}
+
+/** The default first week: the manager edits it into the plan, and the hire sees whichever exists. */
+export function defaultFirstWeek(h: HireView['hire'], mgrFirst: string, buddyFirst: string | null, sessionWhere: string | null, workTitle: string | null): PlanDay[] {
+  return [
+    [{ t: '9:00', l: sessionWhere ? `Orientation · ${sessionWhere}` : 'Orientation' }, { t: '1:00 pm', l: `First 1:1 with ${mgrFirst}` }, { t: '3:00 pm', l: 'Set up your tools with IT, if anything is left' }],
+    [{ t: '10:00', l: buddyFirst ? `Coffee with ${buddyFirst}, your buddy` : 'Team coffee' }, { t: '2:00 pm', l: 'Team standup and introductions' }],
+    [{ t: 'All day', l: 'Focus time: no-meeting Wednesday' }, { t: '', l: 'Read the onboarding guide for your team' }],
+    [{ t: '11:00', l: workTitle ? `Walkthrough: ${workTitle}` : 'Walkthrough of your first piece of work' }, { t: '3:00 pm', l: 'Lunch and learn' }],
+    [{ t: '3:00 pm', l: 'Friday demo hour' }, { t: '4:00 pm', l: `Week-one check-in with ${mgrFirst}` }],
+  ]
+}
+
+/** The first week the hire sees: the manager's saved plan, or the default agenda until there is one. */
+export function usePlan(v: HireView) {
+  const ctx = useCtx()
+  const saved = useDemo((s) => s.plans[v.hire.id])
+  const stored = useDemo((s) => s.firstWork[v.hire.id])
+  // A step done before the demo started has no saved text, so fall back to wording built from the hire's milestone.
+  const work = stored ?? (v.by.first_work?.state === 'verified' ? { title: `A starter task toward your ${v.hire.milestone.charAt(0).toLowerCase() + v.hire.milestone.slice(1)}`, link: '' } : undefined)
+  const h = v.hire
+  const session = SESSIONS.find((x) => x.day === h.start && x.group === groupFor(h))
+  const buddy = buddyOf(v)
+  const firstName = (id: string) => people[id]?.name.split(' ')[0] ?? id
+  const plan = saved ?? defaultFirstWeek(h, firstName(managerFor(h, ctx).id), buddy ? firstName(buddy) : null, session?.where ?? null, work?.title ?? null)
+  return { plan, work, session, saved: !!saved || v.by.first_week?.state === 'verified' }
 }
 
 /** How a hire's own task reads to them. */
