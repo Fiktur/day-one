@@ -1,11 +1,12 @@
-import { ChevronRight, ExternalLink } from 'lucide-react'
+import { useState } from 'react'
+import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn, lc } from '../lib/cn'
 import { useNav } from '../nav/NavContext'
 import { useView } from '../engine/selectors'
 import { useDemo } from '../engine/store'
 import type { HireView } from '../engine/derive'
-import { fmtDay, fmtWeekdayShort, rel } from '../lib/dates'
+import { addBiz, fmtDay, fmtShort, fmtWeekdayShort, rel } from '../lib/dates'
 import { people } from '../data/people'
 import { PEPPER_VIDEO } from '../data/welcome'
 import { Button, Glyph, ReqTag } from '../ui/parts'
@@ -28,6 +29,7 @@ export function HireHome() {
   const flashes = useDemo((s) => s.flashes)
   const markDone = useDemo((s) => s.markDone)
   const change = useDemo((s) => [...s.dateChanges].reverse().find((c) => c.hireId === viewer))
+  const [showHandled, setShowHandled] = useState(false)
   if (!v) return null
   const h = v.hire
   const first = v.person.name.split(' ')[0]
@@ -43,6 +45,10 @@ export function HireHome() {
   const handled = handledFor(v, now, laptopModel)
   const companySlow = handled.some((x) => x.text.startsWith('Taking longer'))
   const pct = own.length ? doneCount / own.length : 0
+  // The forecast says the date won't hold, but nobody has moved it yet: say so plainly, without alarm.
+  const mayMove = !blocked && !change && v.forecastEnd != null && v.forecastEnd >= h.start
+  const slow = handled.filter((x) => x.text.startsWith('Taking longer'))
+  const inMotion = handled.filter((x) => x.glyph === 'prog').length
 
   if (started) return <StartedHome />
 
@@ -78,14 +84,15 @@ export function HireHome() {
                 </div>
               )}
               <div className="mt-1 text-[13px] font-medium text-white/85">{blocked ? `Not ${fmtWeekdayShort(h.start)}. ${people[h.managerId]?.name.split(' ')[0]} will be in touch.` : fmtWeekdayShort(h.start)}</div>
+              {mayMove && <div className="mt-1 text-[12px] text-white/85">Your start date may move. {people.maria.name.split(' ')[0]} will confirm it with you by {fmtShort(addBiz(now, 2))}.</div>}
             </div>
-            <Ring pct={pct} label={<><Num value={doneCount} />/{own.length}</>} />
+            <Ring pct={pct} label={<><Num value={doneCount} />/{own.length}</>} aria={`${doneCount} of ${own.length} of your tasks done`} />
           </div>
           <div className="relative mt-3 flex items-center gap-2 rounded-2xl bg-white/15 px-3 py-2 text-[12.5px] backdrop-blur">
             <span className="grid h-5 w-5 place-items-center rounded-full bg-white">
               <Glyph state={anyRed ? 'late' : 'verified'} size={14} />
             </span>
-            <span className="min-w-0 truncate font-medium">{anyRed ? 'One thing needs you today' : actionable.length ? (companySlow ? "You're on track. One thing is with us." : "You're on track. Nothing late.") : "You're all set for now"}</span>
+            <span className="min-w-0 truncate font-medium">{anyRed ? 'One thing needs you today' : mayMove ? 'Nothing you need to do right now' : actionable.length ? (companySlow ? "You're on track. One thing is with us." : "You're on track. Nothing late.") : "You're all set for now"}</span>
           </div>
           {!blocked && <Emoji name="rocket" size={46} float className="absolute bottom-12 right-[92px] opacity-95" />}
         </motion.div>
@@ -153,12 +160,20 @@ export function HireHome() {
       </AnimatePresence>
 
       <div className="rounded-[22px] border border-line bg-surface p-3.5 shadow-card">
-        <div className="mb-2.5 font-mono text-[10px] uppercase tracking-[0.12em] text-faint">Being handled for you <ReqTag ids="E7 T2" /></div>
-        <ul className="space-y-2">
-          {handled.map((x, i) => (
-            <HandledRow key={x.key} x={x} i={i} flash={x.flashKeys.some((k) => flashes[`${viewer}:${k}`])} v={v} />
-          ))}
-        </ul>
+        <button type="button" aria-expanded={showHandled} onClick={() => setShowHandled(!showHandled)} className="flex w-full items-center gap-2 text-left">
+          <span className="min-w-0 flex-1">
+            <span className="block font-mono text-[10px] uppercase tracking-[0.12em] text-faint">Being handled for you <ReqTag ids="E7 T2" /></span>
+            <span className="mt-0.5 block text-[13px] font-semibold">{inMotion ? `${inMotion} thing${inMotion > 1 ? 's' : ''} in motion` : 'All done so far'}<span className="font-normal text-muted"> · {slow.length ? 'one is taking longer' : 'all on track'}</span></span>
+          </span>
+          <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted transition', showHandled && 'rotate-180')} />
+        </button>
+        {(showHandled || slow.length > 0) && (
+          <ul className="mt-2.5 space-y-2">
+            {(showHandled ? handled : slow).map((x, i) => (
+              <HandledRow key={x.key} x={x} i={i} flash={x.flashKeys.some((k) => flashes[`${viewer}:${k}`])} v={v} />
+            ))}
+          </ul>
+        )}
       </div>
 
       <motion.button whileTap={{ scale: 0.98 }} type="button" onClick={() => go({ name: 'welcome' })} className="block w-full overflow-hidden rounded-[22px] border border-line bg-surface p-3.5 text-left shadow-card">
@@ -187,21 +202,18 @@ export function HireHome() {
         </div>
       </motion.button>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="flex flex-wrap gap-2">
         {([
           { name: 'firstweek', label: 'First week', emoji: 'calendar' },
           { name: 'people', label: 'Your people', emoji: 'people' },
           { name: 'company', label: 'Benefits', emoji: 'heart' },
-        ] as const).map((x, i) => (
-          <Tilt key={x.name} max={10}>
-            <button type="button" onClick={() => go({ name: x.name })} className="flex w-full flex-col items-start gap-2 rounded-[20px] border border-line bg-surface p-3 text-left text-[13px] font-semibold shadow-card">
-              <Emoji name={x.emoji} size={30} float delay={i * 0.5} />
-              {x.label}
-            </button>
-          </Tilt>
+        ] as const).map((x) => (
+          <motion.button key={x.name} whileTap={{ scale: 0.94 }} whileHover={{ y: -1.5 }} transition={springs.bouncy} type="button" onClick={() => go({ name: x.name })} className="flex items-center gap-1.5 rounded-full border border-line bg-surface py-1.5 pl-2 pr-3 text-[13px] font-semibold shadow-card">
+            <Emoji name={x.emoji} size={20} />
+            {x.label}
+          </motion.button>
         ))}
       </div>
-      <p className="px-1 text-center text-[11px] text-faint">Questions? Tap Help. A real person is always one tap away.</p>
     </div>
   )
 }
@@ -234,9 +246,10 @@ function HandledRow({ x, i, flash, v }: { x: HandledItem; i: number; flash: bool
 /** Ordered → set up → shipped → delivered, with the parcel riding along the line. */
 export function ShipTracker({ v, inset = true }: { v: HireView; inset?: boolean }) {
   const b = v.by
-  const stops = ['Ordered', 'Set up', 'Shipped', 'Delivered']
   const ordered = b.laptop_release && b.laptop_release.state !== 'blank'
   if (!ordered) return null
+  const placed = b.laptop_release!.state === 'verified'
+  const stops = [v.hire.rehire ? (placed ? 'Reissued' : 'Reissuing') : placed ? 'Ordered' : 'Ordering', 'Set up', 'Shipped', 'Delivered']
   const at =
     b.laptop_deliver?.state === 'verified' || b.laptop_received?.state === 'verified' ? 3
       : b.laptop_ship?.state === 'verified' ? 2
@@ -266,18 +279,18 @@ export function ShipTracker({ v, inset = true }: { v: HireView; inset?: boolean 
   )
 }
 
-function Ring({ pct, label }: { pct: number; label: React.ReactNode }) {
+function Ring({ pct, label, aria }: { pct: number; label: React.ReactNode; aria: string }) {
   const r = 30
   const c = 2 * Math.PI * r
   return (
-    <div className="relative grid h-[78px] w-[78px] shrink-0 place-items-center">
+    <div role="img" aria-label={aria} title={aria} className="relative grid h-[78px] w-[78px] shrink-0 place-items-center">
       <svg viewBox="0 0 72 72" className="absolute inset-0 -rotate-90">
         <circle cx="36" cy="36" r={r} fill="none" stroke="rgb(255 255 255 / 0.22)" strokeWidth="7" />
         <motion.circle cx="36" cy="36" r={r} fill="none" stroke="white" strokeWidth="7" strokeLinecap="round" strokeDasharray={c} initial={{ strokeDashoffset: c }} animate={{ strokeDashoffset: c * (1 - pct) }} transition={{ ...springs.soft, delay: 0.25 }} />
       </svg>
       <div className="text-center leading-none">
         <div className="font-display text-[17px] font-extrabold">{label}</div>
-        <div className="mt-0.5 text-[9px] font-medium uppercase tracking-wider text-white/75">done</div>
+        <div className="mt-0.5 text-[8px] font-medium uppercase leading-tight tracking-wider text-white/75">your<br />tasks</div>
       </div>
     </div>
   )

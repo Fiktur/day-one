@@ -191,7 +191,7 @@ export const useDemo = create<DemoState>()((set, get) => ({
   shiftNow: (by) => get().setNow(get().now + by),
   setSetup: (setup) => {
     set({ setup })
-    get().addLog(entry(get().now, hhmm(), 'day one', 'setup.changed', setup === 'manual' ? 'Manual-first setup: Firstbase, Google and immigration steps are marked by owners' : 'Connected setup: systems report progress automatically', 'info'))
+    get().addLog(entry(get().now, hhmm(), 'day one', 'setup.changed', setup === 'manual' ? 'Manual updates: Firstbase, Google and immigration steps are marked done by their owners' : 'Automatic updates: systems report progress on their own', 'info'))
   },
 
   markDone: (hireId, key, by, occurred) => {
@@ -432,6 +432,7 @@ export const useDemo = create<DemoState>()((set, get) => ({
     resetClockTime()
     const s = get()
     set({ ...initial(), theme: s.theme, split: s.split, sound: s.sound, intro: false, presenterHidden: false })
+    toast.dismiss()
     toast('Demo reset', { description: 'Back to Thursday, Oct 15, 9:00 am.' })
   },
 }))

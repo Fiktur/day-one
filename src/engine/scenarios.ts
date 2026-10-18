@@ -46,7 +46,7 @@ export const SCENARIOS: Scenario[] = [
     n: 2,
     title: 'Clearance opens the gate',
     who: 'Virgil Hawkins',
-    blurb: "Checkr finishes Virgil's check and Screening records clearance. The laptop order and hire record unlock for IT and People Systems.",
+    blurb: "Checkr finishes Virgil's check and Screening records clearance. The laptop order and hire record unlock for IT and HR Operations.",
     panes: [
       { viewer: 'virgil', route: { name: 'home' } },
       { viewer: 'tony', route: { name: 'myhires' } },
@@ -65,8 +65,8 @@ export const SCENARIOS: Scenario[] = [
       later(1900, () => {
         S().markDone('virgil', 'clearance', 'jennifer')
         S().flash('virgil:laptop_release', 'virgil:wd_hire')
-        S().addLog(entry(S().now, hhmm(), 'day one', 'gate.opened', 'Virgil Hawkins · clearance → laptop order (IT), hire record (People Systems)', 'ok', 'Virgil Hawkins'))
-        toast.success('Gate opened: two teams can start', { description: 'IT: release laptop order · People Systems: finalize hire record' })
+        S().addLog(entry(S().now, hhmm(), 'day one', 'gate.opened', 'Virgil Hawkins · clearance → laptop order (IT), hire record (HR Operations)', 'ok', 'Virgil Hawkins'))
+        toast.success('Gate opened: two teams can start', { description: 'IT: release laptop order · HR Operations: finalize hire record' })
         burst('stars')
       })
     },
@@ -75,7 +75,7 @@ export const SCENARIOS: Scenario[] = [
     n: 3,
     title: 'Laptop backordered',
     who: 'Hal Jordan',
-    blurb: "Firstbase reports Hal's laptop is backordered. Day One forecasts that his start date is now at risk and suggests fixes.",
+    blurb: "Firstbase reports Hal's laptop is backordered. Day One forecasts that Hal's start date is now at risk and suggests fixes.",
     panes: [
       { viewer: 'hal', route: { name: 'home' } },
       { viewer: 'carol', route: { name: 'hire', hireId: 'hal' } },
@@ -94,7 +94,7 @@ export const SCENARIOS: Scenario[] = [
     n: 4,
     title: 'Start date moves',
     who: 'Wanda Maximoff',
-    blurb: "Wanda's work permit won't arrive in time. Maria previews the impact of moving her start to Nov 30, then confirms.",
+    blurb: "Wanda's work permit won't arrive in time. Maria previews the impact of moving Wanda's start to Nov 30, then confirms.",
     panes: [
       { viewer: 'wanda', route: { name: 'home' } },
       { viewer: 'kate', route: { name: 'candidates' } },
@@ -162,7 +162,7 @@ export const SCENARIOS: Scenario[] = [
       const s = S()
       if (s.hires.wade.withdrawn != null) return
       s.withdraw('wade')
-      toast('Wade Wilson withdrew his acceptance', { description: 'Scheduled messages stopped. IT and Screening each got one cancellation to do.' })
+      toast('Wade Wilson withdrew from the offer', { description: 'Scheduled messages stopped. IT and Screening each got one cancellation to do.' })
     },
   },
   {

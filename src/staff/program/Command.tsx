@@ -14,6 +14,7 @@ import { AnimatePresence, LayoutGroup, Num, Reveal, Segmented, Tilt, motion, spr
 import { Emoji, type EmojiName } from '../../ui/assets'
 
 type ViewMode = 'list' | 'board' | 'calendar'
+type Filter = 'all' | 'attention' | 'unknown' | 'confirming' | number
 
 export function Command() {
   const { go, compact } = useNav()
@@ -21,35 +22,39 @@ export function Command() {
   const now = useDemo((s) => s.now)
   const [mode, setMode] = useState<ViewMode>('list')
   const groupId = useId()
-  const [only, setOnly] = useState<'all' | 'attention'>('all')
   const [loc, setLoc] = useState<string>('all')
   const all = orderedHires(views)
   const groups = Array.from(new Set(all.map((v) => groupFor(v.hire))))
-  const needsAttention = (v: HireView) => v.status === 'atrisk' || v.status === 'unknown' || v.balls.some((b) => b.red)
-  const list = all.filter((v) => (only === 'attention' ? needsAttention(v) : true) && (loc === 'all' || groupFor(v.hire) === loc))
-  const startA = 28
-  const startB = 35
+  const needsAttention = (v: HireView) => v.status !== 'withdrawn' && (v.status === 'atrisk' || v.status === 'unknown' || v.balls.some((b) => b.red))
+  const red = all.filter(needsAttention).length
+  // Open on the problems when there are any; every tile below is also a filter.
+  const [only, setOnly] = useState<Filter>(() => (red ? 'attention' : 'all'))
+  const has = (v: HireView, st: string) => v.steps.some((s) => s.state === st)
+  const match = (v: HireView) =>
+    only === 'all' ? true : only === 'attention' ? needsAttention(v) : only === 'unknown' || only === 'confirming' ? has(v, only) : v.hire.start === only && v.status !== 'withdrawn'
+  const list = all.filter((v) => match(v) && (loc === 'all' || groupFor(v.hire) === loc))
+  const [startA, startB] = Array.from(new Set(all.filter((v) => v.status !== 'withdrawn' && v.hire.start >= now).map((v) => v.hire.start))).sort((a, b) => a - b)
   const count = (d: number) => all.filter((v) => v.hire.start === d && v.status !== 'withdrawn').length
-  const red = all.filter((v) => v.status !== 'withdrawn' && needsAttention(v)).length
   const unknown = all.reduce((n, v) => n + v.steps.filter((s) => s.state === 'unknown').length, 0)
   const confirming = all.reduce((n, v) => n + v.steps.filter((s) => s.state === 'confirming').length, 0)
+  const toggle = (f: Filter) => setOnly(only === f ? 'all' : f)
 
   return (
     <Page>
       <PageHeader
         title="Command center"
-        sub={`Every hire, who has the ball, and what's late. ${fmtDay(now)}.`}
+        sub={`Every hire, who they're waiting on, and what's late. ${fmtDay(now)}.`}
         tags={<ReqTag ids="O6 O5 X1" />}
         right={
           <Segmented value={mode} onChange={setMode} options={[['list', 'List'], ['board', 'Board'], ['calendar', 'Calendar']] as const} />
         }
       />
       <div className={cn('mb-4 grid gap-3', compact ? 'grid-cols-2' : 'grid-cols-5')}>
-        <Stat i={0} emoji="calendar" label={`Starting ${fmtShort(startA)}`} value={count(startA)} />
-        <Stat i={1} emoji="rocket" label={`Starting ${fmtShort(startB)}`} value={count(startB)} />
-        <Stat i={2} emoji="warning" label="Hires needing attention" value={red} tone={red ? 'red' : undefined} onClick={() => setOnly('attention')} />
-        <Stat i={3} emoji="plug" label="Can't check" value={unknown} tone={unknown ? 'dashed' : undefined} />
-        {!compact && <Stat i={4} emoji="hourglass" label="Waiting to confirm" value={confirming} />}
+        {startA != null && <Stat i={0} emoji="calendar" label={`Starting ${fmtShort(startA)}`} value={count(startA)} on={only === startA} onClick={() => toggle(startA)} />}
+        {startB != null && <Stat i={1} emoji="rocket" label={`Starting ${fmtShort(startB)}`} value={count(startB)} on={only === startB} onClick={() => toggle(startB)} />}
+        <Stat i={2} emoji="warning" label="Hires needing attention" value={red} tone={red ? 'red' : undefined} on={only === 'attention'} onClick={() => toggle('attention')} />
+        <Stat i={3} emoji="plug" label="Can't check right now" value={unknown} tone={unknown ? 'dashed' : undefined} on={only === 'unknown'} onClick={() => toggle('unknown')} />
+        {!compact && <Stat i={4} emoji="hourglass" label="Waiting to confirm" value={confirming} on={only === 'confirming'} onClick={() => toggle('confirming')} />}
       </div>
       <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
         <Chip on={only === 'all'} onClick={() => setOnly('all')}>Everyone</Chip>
@@ -63,7 +68,7 @@ export function Command() {
         <Card className="overflow-hidden">
           {!compact && (
             <div className="grid grid-cols-[minmax(0,1.3fr)_64px_96px_minmax(0,1fr)_minmax(0,1.6fr)_96px] gap-3 border-b border-line bg-bg px-4 py-2 font-mono text-[10px] uppercase tracking-wider text-faint">
-              <span>Hire</span><span>Starts</span><span>Stage</span><span>Who has the ball</span><span>Next step</span><span>Status</span>
+              <span>Hire</span><span>Starts</span><span>Stage</span><span>Waiting on</span><span>Next step</span><span>Status</span>
             </div>
           )}
           <AnimatePresence initial={false}>
@@ -129,8 +134,8 @@ function HireRow({ v, compact, onOpen }: { v: HireView; compact: boolean; onOpen
   const p = v.balls.find((b) => b.red) ?? v.primary
   const coord = isCoordinator(viewer)
   const ds = p ? displayState(p, isMine(p, viewer), coord) : 'blank'
-  const nextName = p ? safeName(p, { role: person.role, team: person.team }) : v.status === 'started' ? 'Ramping' : 'Nothing open'
-  const tint = v.status === 'atrisk' ? 'bg-red-soft/50' : v.status === 'unknown' ? 'bg-sunken/60' : ''
+  const nextName = p ? safeName(p, { role: person.role, team: person.team }, { action: true }) : v.status === 'started' ? 'Ramping' : 'Nothing open'
+  const tint = v.status === 'atrisk' ? 'bg-red-soft/50' : v.status === 'behind' ? 'bg-amber-soft/40' : v.status === 'unknown' ? 'bg-sunken/60' : ''
   if (compact) {
     return (
       <button type="button" onClick={onOpen} className={cn('flex w-full items-center gap-3 border-b border-line px-3 py-2.5 text-left last:border-0', tint, flash && 'animate-flash')}>
@@ -139,7 +144,7 @@ function HireRow({ v, compact, onOpen }: { v: HireView; compact: boolean; onOpen
           <div className="flex items-center gap-2"><span className="truncate text-[13px] font-medium">{v.person.name}</span><span className="text-xs text-muted">{fmtShort(v.hire.start)}</span></div>
           {p && <div className={cn('flex items-center gap-1.5 truncate text-xs', p.red ? 'text-red' : 'text-muted')}><Glyph state={ds} red={p.red} size={9} />{nextName} · {lc(p.label)}</div>}
         </div>
-        {p?.holder && <BallChip step={p} now={now} size="sm" />}
+        {p?.holder && <span className="min-w-0 max-w-[45%]"><BallChip step={p} now={now} size="sm" /></span>}
       </button>
     )
   }
@@ -167,11 +172,11 @@ function HireRow({ v, compact, onOpen }: { v: HireView; compact: boolean; onOpen
   )
 }
 
-function Stat({ label, value, tone, onClick, emoji, i = 0 }: { label: string; value: number; tone?: 'red' | 'dashed'; onClick?: () => void; emoji: EmojiName; i?: number }) {
+function Stat({ label, value, tone, onClick, on, emoji, i = 0 }: { label: string; value: number; tone?: 'red' | 'dashed'; onClick?: () => void; on?: boolean; emoji: EmojiName; i?: number }) {
   return (
     <Reveal i={i}>
       <Tilt max={7}>
-        <button type="button" onClick={onClick} className={cn('relative w-full overflow-hidden rounded-[20px] border bg-surface px-4 py-3.5 text-left shadow-card', tone === 'red' ? 'border-red/40 bg-gradient-to-br from-surface to-red-soft' : tone === 'dashed' ? 'border-dashed border-muted' : 'border-line/80', !onClick && 'cursor-default')}>
+        <button type="button" onClick={onClick} aria-pressed={on} className={cn('relative w-full overflow-hidden rounded-[20px] border bg-surface px-4 py-3.5 text-left shadow-card', tone === 'red' ? 'border-red/40 bg-gradient-to-br from-surface to-red-soft' : tone === 'dashed' ? 'border-dashed border-muted' : 'border-line/80', on && 'ring-2 ring-accent/50', !onClick && 'cursor-default')}>
           <Emoji name={emoji} size={36} float delay={i * 0.6} className="absolute right-3 top-3" />
           <div className="pr-10 text-xs font-medium text-muted">{label}</div>
           <Num value={value} className={cn('mt-1 block font-display text-[34px] font-extrabold leading-none', tone === 'red' && 'text-red')} />

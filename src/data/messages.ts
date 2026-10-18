@@ -12,8 +12,8 @@ export interface MsgTemplate {
   name: string
   trigger: MsgTrigger
   from: MsgFrom
-  subject: (first: string, managerFirst: string) => string
-  body: (first: string, managerFirst: string) => string
+  subject: (first: string, managerFirst: string, buddyFirst: string | null) => string
+  body: (first: string, managerFirst: string, buddyFirst: string | null) => string
   rules: string[]
   editableByManager?: number // days before start when edits close
   when?: (h: HireBase) => boolean
@@ -66,7 +66,7 @@ export const MSG_TEMPLATES: MsgTemplate[] = [
   {
     id: 'manager_welcome', name: 'A note from your manager', trigger: { type: 'rel', rel: -7 }, from: 'manager',
     subject: (f, m) => `A note from ${m}`,
-    body: (f, m) => `Hi ${f}, I'm really looking forward to working with you. Your first week is planned and Jaime will be your buddy. See you soon. ${m}`,
+    body: (f, m, b) => `Hi ${f}, I'm really looking forward to working with you. ${b ? `${b} will be your buddy for the first few weeks.` : 'We’re picking a buddy to show you around.'} See you soon. ${m}`,
     rules: ['Manager can edit until the day before it sends', 'The default sends if unchanged', 'Sent in the manager’s name'],
     editableByManager: -8, reqs: ['M4'],
   },
@@ -74,7 +74,7 @@ export const MSG_TEMPLATES: MsgTemplate[] = [
     id: 'buddy', name: 'Hi from your buddy', trigger: { type: 'rel', rel: -5 }, from: 'buddy',
     subject: () => 'Hi from your buddy',
     body: (f) => `Hey ${f}! I'm your buddy for the first few weeks. I've booked us a coffee on day two.`,
-    rules: ['Sends only if a buddy is assigned'], when: (h) => !!h.buddyId,
+    rules: ['Waits until the manager picks a buddy']
   },
   {
     id: 'logistics', name: 'How day one works', trigger: { type: 'rel', rel: -3 }, from: 'program',
@@ -99,7 +99,7 @@ export const MSG_TEMPLATES: MsgTemplate[] = [
 export const FROM_LABEL: Record<MsgFrom, string> = {
   company: 'Pepper Potts, Head of People',
   manager: 'Hiring manager',
-  program: 'Maria Hill, People Experience',
+  program: 'Maria Hill, Onboarding team',
   buddy: 'Buddy',
   it: 'Northbeam IT',
 }

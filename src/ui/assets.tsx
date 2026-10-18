@@ -45,6 +45,12 @@ export const TEAM_EMOJI: Record<string, EmojiName> = {
   it: 'laptop', hris: 'gear', screening: 'shield', mobility: 'globe', workplace: 'office', program: 'sparkles', recruiting: 'magnifier',
 }
 
+/** One picture per outside system, shared by vendor avatars and the systems map. */
+export const SYSTEM_EMOJI: Record<string, EmojiName> = {
+  greenhouse: 'seedling', workday: 'id', checkr: 'shield', immigration: 'globe', firstbase: 'laptop', carrier: 'package',
+  google: 'key', calendar: 'calendar', benefits: 'heart', badge: 'office',
+}
+
 export const STEP_EMOJI: Record<string, EmojiName> = {
   offer: 'party', details: 'id', laptop_choice: 'laptop', consent: 'shield', bg_order: 'shield', bg_complete: 'shield', clearance: 'shield',
   mobility_review: 'globe', permit: 'globe', cohort_seat: 'calendar', wd_prehire: 'page', wd_contacts: 'page', wd_id: 'id', wd_tax: 'page',

@@ -21,9 +21,9 @@ export function isMine(step: StepView, viewer: string): boolean {
   return false
 }
 
-export function useStepName(step: StepView): string {
+export function useStepName(step: StepView, opts?: { action?: boolean }): string {
   const { person } = useNav()
-  return safeName(step, { role: person.role, team: person.team })
+  return safeName(step, { role: person.role, team: person.team }, opts)
 }
 
 /** Mark done with "When did this happen?" so manual steps keep honest lead times. */
@@ -33,6 +33,7 @@ export function MarkDoneButton({ view, step, label = 'Mark done', size = 'xs' }:
   const markDone = useDemo((s) => s.markDone)
   const [when, setWhen] = useState(0)
   const [note, setNote] = useState('')
+  const name = useStepName(step)
   const options = [0, 1, 2, 3].map((n) => now - n).filter((d) => step.open == null || d >= step.open)
   return (
     <Popover
@@ -42,7 +43,7 @@ export function MarkDoneButton({ view, step, label = 'Mark done', size = 'xs' }:
     >
       <div className="space-y-3">
         <div>
-          <div className="text-[13px] font-semibold">{step.name}</div>
+          <div className="text-[13px] font-semibold">{name}</div>
           <div className="text-xs text-muted">{view.person.name}</div>
         </div>
         <div className="text-xs text-muted" id={`when-${view.hire.id}-${step.key}`}>When did this happen?</div>
@@ -77,7 +78,7 @@ export function MarkDoneButton({ view, step, label = 'Mark done', size = 'xs' }:
             onClick={(e) => {
               burst('small', e.currentTarget)
               markDone(view.hire.id, step.key, viewer, options[when])
-              toast.success(`${step.name}: done`, { description: `${view.person.name}${when ? ` · happened ${fmtDay(options[when])}` : ''}` })
+              toast.success(`${name}: done`, { description: `${view.person.name}${when ? ` · happened ${fmtDay(options[when])}` : ''}` })
             }}
           >
             Mark done
@@ -93,11 +94,12 @@ export function StepActions({ view, step }: { view: HireView; step: StepView }) 
   const confirm = useDemo((s) => s.confirmStep)
   const markNA = useDemo((s) => s.markNA)
   const mine = isMine(step, viewer)
+  const name = useStepName(step)
   if (!mine) return null
   const actionable = step.state === 'open' || step.state === 'soon' || step.state === 'late'
   if (step.state === 'confirming') {
     return (
-      <Button size="xs" variant="primary" onClick={(e) => { burst('small', e.currentTarget); confirm(view.hire.id, step.key, viewer); toast.success(`Confirmed: ${step.name}`, { description: view.person.name }) }}>
+      <Button size="xs" variant="primary" onClick={(e) => { burst('small', e.currentTarget); confirm(view.hire.id, step.key, viewer); toast.success(`Confirmed: ${name}`, { description: view.person.name }) }}>
         Confirm
       </Button>
     )
@@ -114,7 +116,7 @@ export function StepActions({ view, step }: { view: HireView; step: StepView }) 
       <MarkDoneButton view={view} step={step} />
       {teamOwner && (
         <Dropdown trigger={<Button size="xs" variant="ghost" aria-label="More actions"><MoreHorizontal className="h-3.5 w-3.5" /></Button>}>
-          <DropItem onSelect={() => { markNA(view.hire.id, step.key, 'Not needed for this hire', viewer); toast(`Marked not needed: ${step.name}`) }}>Mark not needed…</DropItem>
+          <DropItem onSelect={() => { markNA(view.hire.id, step.key, 'Not needed for this hire', viewer); toast(`Marked not needed: ${name}`) }}>Mark not needed…</DropItem>
           <DropItem onSelect={() => toast('Reassign', { description: 'Pick a teammate to take this step. (Demo only.)' })}>Reassign…</DropItem>
         </Dropdown>
       )}
@@ -140,7 +142,7 @@ export function StepRow({ view, step, showHire, showHolder = true, showSource = 
   const mine = isMine(step, viewer)
   const coord = isCoordinator(viewer)
   const ds = displayState(step, mine, coord)
-  const name = useStepName(step)
+  const name = useStepName(step, { action: mine })
   const tint = ds === 'open' ? 'bg-amber-soft/70' : ds === 'late' || ds === 'soon' || (step.red && ds !== 'prog') ? 'bg-red-soft/70' : ''
   return (
     <div className={cn('group grid grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 rounded-lg px-2.5', dense ? 'py-1.5' : 'py-2', tint, flash && 'animate-flash', className)}>

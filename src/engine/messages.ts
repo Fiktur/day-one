@@ -28,6 +28,7 @@ export function messagesFor(v: HireView, ctx: DeriveCtx, edits: Record<string, {
   const first = v.person.name.split(' ')[0]
   const mgr = managerFor(h, ctx).id
   const mgrFirst = people[mgr]?.name.split(' ')[0] ?? 'Your manager'
+  const buddyFirst = h.buddyId && v.by.buddy?.ver != null && v.by.buddy.ver <= now ? people[h.buddyId]?.name.split(' ')[0] ?? null : null
   const out: MsgInstance[] = []
 
   for (const t of MSG_TEMPLATES) {
@@ -54,6 +55,10 @@ export function messagesFor(v: HireView, ctx: DeriveCtx, edits: Record<string, {
     else if (day <= now) status = 'sent'
     else status = 'scheduled'
 
+    // A buddy message can only go out once a buddy has really been picked.
+    const buddyPicked = v.by.buddy?.ver != null && v.by.buddy.ver <= now && !!h.buddyId
+    if (t.from === 'buddy' && !buddyPicked && status !== 'stopped') { expected = day; day = null; status = 'waiting' }
+
     if (t.id === 'digest' && day != null && day <= now) {
       const due = v.hireTasks.filter((s) => s.due != null && s.due >= day! && s.due <= day! + 7 && !(s.ver != null && s.ver <= day!))
       if (!due.length && status !== 'stopped') status = 'skipped'
@@ -79,8 +84,8 @@ export function messagesFor(v: HireView, ctx: DeriveCtx, edits: Record<string, {
       from,
       fromId,
       channel: day != null && day >= h.start ? 'Work email' : 'Personal email',
-      subject: t.subject(first, mgrFirst),
-      body: edited?.text ?? t.body(first, mgrFirst),
+      subject: t.subject(first, mgrFirst, buddyFirst),
+      body: edited?.text ?? t.body(first, mgrFirst, buddyFirst),
       edited,
       editableUntil: t.editableByManager != null ? prevWeekday(h.start + t.editableByManager) : null,
     })

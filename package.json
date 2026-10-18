@@ -9,6 +9,7 @@
     "build:single": "tsc --noEmit && vite build --mode single",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
+    "smoke": "node scripts/qa/smoke.cjs",
     "artifact": "npm run build:single && node scripts/make-artifact.mjs"
   },
   "dependencies": {

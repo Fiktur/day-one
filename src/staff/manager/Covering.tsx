@@ -4,6 +4,7 @@ import { useNav } from '../../nav/NavContext'
 import { useDemo } from '../../engine/store'
 import { useViews } from '../../engine/selectors'
 import { people } from '../../data/people'
+import { HIRES } from '../../data/hires'
 import { fmtDay, fmtShort } from '../../lib/dates'
 import { Avatar, Button, Card, Empty, ReqTag } from '../../ui/parts'
 import { StepRow } from '../../ui/StepRow'
@@ -19,9 +20,10 @@ export function Covering() {
   const views = useViews()
   const mineAway = ooo[viewer]
   const coveringFor = Object.entries(ooo).filter(([, o]) => o.delegate === viewer && now <= o.until)
-  const managers = Object.values(people).filter((p) => p.role === 'manager' && p.id !== viewer && !['jaime', 'ryan', 'miles'].includes(p.id))
+  const managers = Object.values(people).filter((p) => p.role === 'manager' && p.id !== viewer && !HIRES.some((h) => h.buddyId === p.id))
   const [pick, setPick] = useState(managers.find((m) => m.id === 'lucius')?.id ?? managers[0].id)
-  const [until, setUntil] = useState(now + 14)
+  const [until, setUntil] = useState(mineAway?.until ?? now + 14)
+  const untilOptions = Array.from(new Set([...[7, 14, 21, 29].map((d) => now + d), ...(mineAway ? [mineAway.until] : [])])).sort((a, b) => a - b)
 
   return (
     <Page>
@@ -46,10 +48,10 @@ export function Covering() {
               <Select className="mt-1" label="Covered by" value={pick} onChange={setPick} options={managers.map((m) => [m.id, <span key={m.id} className="flex items-center gap-2"><Avatar id={m.id} size={20} />{m.name}</span>] as const)} />
             </div>
             <div className="w-44 text-xs text-muted">Until
-              <Select className="mt-1" label="Until" value={until} onChange={setUntil} options={[7, 14, 21, 29].map((d) => [now + d, fmtDay(now + d)] as const)} />
+              <Select className="mt-1" label="Until" value={until} onChange={setUntil} options={untilOptions.map((d) => [d, fmtDay(d)] as const)} />
             </div>
             <Button variant="primary" onClick={() => {
-              if (!mineAway) set({ ooo: { ...ooo, [viewer]: { until, delegate: null } } })
+              set({ ooo: { ...ooo, [viewer]: { until, delegate: null } } })
               delegate(viewer, pick)
               toast.success(`${people[pick].name} is covering for you`, { description: 'Your open tasks moved to them.' })
             }}>Set cover</Button>

@@ -37,7 +37,7 @@ export function handledFor(v: HireView, now: number, laptopModel?: string): Hand
     let glyph: GlyphState = 'prog'
     let text = 'In progress with Atlas Immigration'
     if (permit.state === 'verified') { glyph = 'verified'; text = 'Approved' }
-    else if (permit.eta != null) text = `In progress · expected ${fmtDay(permit.eta)}`
+    else if (permit.eta != null) text = `${permit.eta >= v.hire.start ? 'Taking longer than usual' : 'In progress'} · expected ${fmtDay(permit.eta)}`
     out.push({ key: 'permit', label: 'Work permit', glyph, text, flashKeys: ['permit'] })
   }
 
@@ -60,7 +60,7 @@ export function handledFor(v: HireView, now: number, laptopModel?: string): Hand
       const waitingOnPermit = permit && permit.state !== 'verified' && permit.state !== 'na'
       text = `Ordered · set-up starts once your ${waitingOnPermit ? 'work permit' : 'work account'} is ready`
     }
-    else if (rel_.state !== 'blank') { glyph = 'prog'; text = 'Ordering now' }
+    else if (rel_.state !== 'blank') { glyph = 'prog'; text = v.hire.rehire ? 'Reissuing your returned laptop now' : 'Ordering now' }
     out.push({ key: 'laptop', label: laptopModel ? `Laptop · ${laptopModel}` : 'Laptop', glyph, text, flashKeys: ['laptop_release', 'laptop_prep', 'laptop_ship', 'laptop_deliver'] })
   }
 
