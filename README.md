@@ -56,6 +56,15 @@ In the new-hire app, "Mark done" is press-and-hold: a fill sweeps across, then c
 - `src/data/` holds the cast, the journey, the hires, messages, welcome boards and example history. Swap the cast or the company here.
 - Brand colors live in `src/index.css` (`--accent` and friends). The demo is light-only by design; dark tokens remain in the file if you want them back.
 
+## Systems map
+
+People Systems → **Systems** opens on a live map (`src/staff/team/SystemsMap.tsx`). Day One is the hub; Greenhouse, Workday, Checkr and Atlas Immigration feed in on the left, fulfilment systems sit on the right, and new hires and teams sit above and below.
+
+- Line style shows how each system is wired: live API, linked (a person confirms), or manual (the owner marks it done). The Connected / Manual-first switch rewires the map.
+- Every event in the demo's log fires a packet along its connection, coloured by outcome, with a label. Live connections also carry a quiet heartbeat.
+- When a system goes down (scenario 5, or "Simulate an outage"), its node turns red, the heartbeat stops and retries fail halfway, while "Can't check right now" counts up.
+- Below 760px wide (for example inside split view) the map switches to a stacked layout feeding a central spine.
+
 ## The assistant
 
 Answers are scripted (`src/assistant/engine.ts`) and started from suggested questions. `src/assistant/providers.ts` has a switched-off slot for a small model on Cloudflare Workers AI, with the same permission rules. Nothing is connected.

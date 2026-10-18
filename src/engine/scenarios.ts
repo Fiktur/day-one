@@ -28,7 +28,7 @@ export const SCENARIOS: Scenario[] = [
     blurb: 'Virgil marks a Workday task done. It waits to be confirmed, then Workday confirms it and it turns green.',
     panes: [
       { viewer: 'virgil', route: { name: 'tasks' } },
-      { viewer: 'barbara', route: { name: 'systems', tab: 'log' } },
+      { viewer: 'barbara', route: { name: 'systems' } },
       { viewer: 'maria', route: { name: 'hire', hireId: 'virgil' } },
     ],
     run: () => {

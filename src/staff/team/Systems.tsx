@@ -9,9 +9,11 @@ import { SYSTEM_MODES, systemNames, type SystemId } from '../../data/journey'
 import { fmtShort } from '../../lib/dates'
 import { Button, Card, Glyph, Pill, ReqTag } from '../../ui/parts'
 import { Page, PageHeader } from '../StaffShell'
-import { Segmented } from '../../ui/motion'
+import { AnimatePresence, Num, Reveal, Segmented, motion, springs } from '../../ui/motion'
+import { Emoji } from '../../ui/assets'
+import { MapLegend, NODE_META, SystemsMap, type MapNode } from './SystemsMap'
 
-const SYSTEMS: SystemId[] = ['greenhouse', 'workday', 'checkr', 'firstbase', 'google', 'calendar', 'immigration', 'benefits', 'badge']
+const SYSTEMS: Exclude<SystemId, 'dayone'>[] = ['greenhouse', 'workday', 'checkr', 'firstbase', 'google', 'calendar', 'immigration', 'benefits', 'badge']
 
 const CONTRACT: Partial<Record<SystemId, { reads: string; writes: string; trigger: string; freq: string; owner: string; failure: string }>> = {
   greenhouse: { reads: 'Offer accepted, start date, role, location', writes: 'Nothing', trigger: 'Webhook on offer accepted', freq: 'Real time', owner: 'Recruiting', failure: 'Retries for 24 h. Duplicate events are recognised by event ID and ignored.' },
@@ -25,8 +27,8 @@ export function Systems() {
   const { route, compact } = useNav()
   const s = useDemo()
   const views = useViews()
-  const [tab, setTab] = useState(route.tab === 'log' ? 'log' : 'connections')
-  const [sel, setSel] = useState<SystemId>('checkr')
+  const [tab, setTab] = useState(route.tab === 'log' ? 'log' : route.tab === 'connections' ? 'connections' : 'map')
+  const [sel, setSel] = useState<MapNode>('checkr')
   const unknownBy = (sys: SystemId) => Object.values(views).reduce((n, v) => n + v.steps.filter((x) => x.def.system === sys && x.state === 'unknown').length, 0)
   const lastEvent = (sys: SystemId) => s.log.find((l) => l.system === systemNames[sys].toLowerCase() || l.system === sys)
   const topFlash = 'log:top' in s.flashes
@@ -40,11 +42,13 @@ export function Systems() {
         right={
           <>
             <Segmented value={s.setup} onChange={(v) => s.setSetup(v)} options={[['connected', 'Connected'], ['manual', 'Manual-first']] as const} />
-            <Segmented value={tab} onChange={setTab} options={[['connections', 'Connections'], ['log', 'Under the hood']] as const} />
+            <Segmented value={tab} onChange={setTab} options={[['map', 'Live map'], ['connections', 'Connections'], ['log', 'Event log']] as const} />
           </>
         }
       />
-      {tab === 'connections' ? (
+      {tab === 'map' ? (
+        <MapTab sel={sel} setSel={setSel} />
+      ) : tab === 'connections' ? (
         <div className={cn('grid gap-4', compact ? 'grid-cols-1' : 'grid-cols-[minmax(0,1.6fr)_minmax(280px,1fr)]')}>
           <Card className="overflow-hidden">
             {!compact && <div className="grid grid-cols-[1fr_110px_1.3fr_90px_1fr] gap-3 border-b border-line bg-bg px-4 py-2 font-mono text-[10px] uppercase tracking-wider text-faint"><span>System</span><span>Mode</span><span>Status</span><span>Last event</span><span>Affects</span></div>}
@@ -68,23 +72,7 @@ export function Systems() {
               )
             })}
           </Card>
-          <Card className="h-fit space-y-3 p-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">{systemNames[sel]}</h3>
-              <Pill tone={s.down[sel] != null ? 'red' : 'green'}>{s.down[sel] != null ? 'Down' : 'Up'}</Pill>
-            </div>
-            {CONTRACT[sel] ? (
-              <dl className="grid grid-cols-[86px_1fr] gap-x-3 gap-y-1.5 text-[13px]">
-                {Object.entries({ Reads: CONTRACT[sel]!.reads, Writes: CONTRACT[sel]!.writes, Trigger: CONTRACT[sel]!.trigger, Freshness: CONTRACT[sel]!.freq, Owner: CONTRACT[sel]!.owner, 'If it fails': CONTRACT[sel]!.failure }).map(([k, val]) => (
-                  <div key={k} className="contents"><dt className="text-muted">{k}</dt><dd>{val}</dd></div>
-                ))}
-              </dl>
-            ) : <p className="text-[13px] text-muted">No API. People confirm these steps in Day One, with the date they happened.</p>}
-            <div className="flex flex-wrap gap-2 pt-1">
-              <Button size="sm" onClick={() => { s.toggleDown(sel); toast(s.down[sel] != null ? `${systemNames[sel]} restored` : `${systemNames[sel]} marked as down`, { description: 'Every affected step updates everywhere.' }) }}>{s.down[sel] != null ? 'Restore connection' : 'Simulate an outage'}</Button>
-              <Button size="sm" variant="ghost" onClick={() => toast.success('Retry sent', { description: 'Failed updates resume from the step that failed, without duplicating orders or checks.' })}><RefreshCw className="h-3.5 w-3.5" />Retry failed updates</Button>
-            </div>
-          </Card>
+          <SystemDetail sel={sel} />
         </div>
       ) : (
         <Card className="overflow-hidden">
@@ -102,5 +90,99 @@ export function Systems() {
         </Card>
       )}
     </Page>
+  )
+}
+
+function SystemDetail({ sel }: { sel: MapNode }) {
+  const s = useDemo()
+  if (sel === 'hire' || sel === 'team') {
+    const meta = NODE_META[sel]
+    return (
+      <Card className="h-fit space-y-2 p-4">
+        <div className="flex items-center gap-2.5"><Emoji name={meta.emoji} size={28} /><h3 className="font-semibold">{meta.name}</h3></div>
+        <p className="text-[13px] text-muted">
+          {sel === 'hire'
+            ? 'The Day One app: their next step, what is being handled, the welcome board and the assistant. Tasks in Workday or Checkr link out; Day One never stores their documents.'
+            : 'Each owner gets only their own next step, with a due date, plus a nudge before anything turns red. Program managers see every hand-off.'}
+        </p>
+      </Card>
+    )
+  }
+  return (
+          <Card className="h-fit space-y-3 p-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold">{systemNames[sel]}</h3>
+              <Pill tone={s.down[sel] != null ? 'red' : 'green'}>{s.down[sel] != null ? 'Down' : 'Up'}</Pill>
+            </div>
+            {CONTRACT[sel] ? (
+              <dl className="grid grid-cols-[86px_1fr] gap-x-3 gap-y-1.5 text-[13px]">
+                {Object.entries({ Reads: CONTRACT[sel]!.reads, Writes: CONTRACT[sel]!.writes, Trigger: CONTRACT[sel]!.trigger, Freshness: CONTRACT[sel]!.freq, Owner: CONTRACT[sel]!.owner, 'If it fails': CONTRACT[sel]!.failure }).map(([k, val]) => (
+                  <div key={k} className="contents"><dt className="text-muted">{k}</dt><dd>{val}</dd></div>
+                ))}
+              </dl>
+            ) : <p className="text-[13px] text-muted">No API. People confirm these steps in Day One, with the date they happened.</p>}
+            <div className="flex flex-wrap gap-2 pt-1">
+              <Button size="sm" onClick={() => { s.toggleDown(sel); toast(s.down[sel] != null ? `${systemNames[sel]} restored` : `${systemNames[sel]} marked as down`, { description: 'Every affected step updates everywhere.' }) }}>{s.down[sel] != null ? 'Restore connection' : 'Simulate an outage'}</Button>
+              <Button size="sm" variant="ghost" onClick={() => toast.success('Retry sent', { description: 'Failed updates resume from the step that failed, without duplicating orders or checks.' })}><RefreshCw className="h-3.5 w-3.5" />Retry failed updates</Button>
+            </div>
+          </Card>
+  )
+}
+
+/** The live map, with the numbers that matter above it and the event feed beside the detail card. */
+function MapTab({ sel, setSel }: { sel: MapNode; setSel: (n: MapNode) => void }) {
+  const { compact } = useNav()
+  const s = useDemo()
+  const views = useViews()
+  const steps = Object.values(views).flatMap((v) => v.steps)
+  const live = SYSTEMS.filter((x) => SYSTEM_MODES[s.setup][x] === 'connected' && s.down[x] == null).length
+  const stats = [
+    { label: 'Events today', value: s.log.filter((l) => l.day === s.now).length, emoji: 'bell' as const },
+    { label: 'Live connections', value: live, suffix: ` of ${SYSTEMS.length}`, emoji: 'plug' as const },
+    { label: 'Waiting on a system', value: steps.filter((x) => x.state === 'confirming').length, emoji: 'hourglass' as const },
+    { label: "Can't check right now", value: steps.filter((x) => x.state === 'unknown').length, emoji: 'warning' as const, tone: 'red' as const },
+  ]
+  return (
+    <div className="space-y-4">
+      <div className={cn('grid gap-3', compact ? 'grid-cols-2' : 'grid-cols-4')}>
+        {stats.map((x, i) => (
+          <Reveal key={x.label} i={i}>
+            <Card className={cn('relative overflow-hidden px-4 py-3', x.tone === 'red' && x.value > 0 && 'border-red/40 bg-gradient-to-br from-surface to-red-soft')}>
+              <Emoji name={x.emoji} size={28} float delay={i * 0.5} className="absolute right-3 top-3" />
+              <div className="pr-8 text-xs font-medium text-muted">{x.label}</div>
+              <Num value={x.value} suffix={x.suffix} className={cn('mt-1 block font-display text-[28px] font-extrabold leading-none', x.tone === 'red' && x.value > 0 && 'text-red')} />
+            </Card>
+          </Reveal>
+        ))}
+      </div>
+      <Card className="overflow-hidden p-3 sm:p-4">
+        <SystemsMap selected={sel} onSelect={setSel} />
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line/70 pt-3">
+          <MapLegend />
+          <span className="text-[11px] text-faint">Click a system for its contract. Try scenario 5, or Simulate an outage.</span>
+        </div>
+      </Card>
+      <div className={cn('grid gap-4', compact ? 'grid-cols-1' : 'grid-cols-[minmax(280px,1fr)_minmax(0,1.4fr)]')}>
+        <SystemDetail sel={sel} />
+        <Card className="overflow-hidden">
+          <div className="flex items-center gap-2 border-b border-line/70 px-4 py-2.5">
+            <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green opacity-60" /><span className="relative inline-flex h-2 w-2 rounded-full bg-green" /></span>
+            <span className="text-[13px] font-semibold">Live feed</span>
+            <span className="text-xs text-muted">· newest first</span>
+          </div>
+          <ul className="divide-y divide-line/70">
+            <AnimatePresence initial={false}>
+              {s.log.slice(0, 6).map((l) => (
+                <motion.li key={l.id} layout="position" initial={{ opacity: 0, x: 20, backgroundColor: 'rgba(51,85,255,0.10)' }} animate={{ opacity: 1, x: 0, backgroundColor: 'rgba(51,85,255,0)' }} exit={{ opacity: 0 }} transition={{ ...springs.snappy, backgroundColor: { duration: 1.4 } }} className="grid grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-2 text-[12.5px]">
+                  <span className={cn('h-2 w-2 rounded-full', l.tone === 'bad' ? 'bg-red' : l.tone === 'warn' ? 'bg-amber' : l.tone === 'ok' ? 'bg-green' : 'bg-accent')} />
+                  <span className="min-w-0"><span className="font-medium">{l.system}</span> <span className="font-mono text-[11px] text-muted">{l.event}</span><span className="block truncate text-muted">{l.outcome}</span></span>
+                  <span className="font-mono text-[11px] text-faint">{l.time.slice(0, 5)}</span>
+                </motion.li>
+              ))}
+            </AnimatePresence>
+          </ul>
+        </Card>
+      </div>
+    </div>
   )
 }

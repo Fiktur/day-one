@@ -140,3 +140,11 @@ button { -webkit-tap-highlight-color: transparent; }
 @media (prefers-reduced-motion: reduce) {
   .dawn::before, .dawn::after, .dawn > i, .bob, .wave, .shimmer-text, .halo-amber, .halo-red { animation: none !important; }
 }
+
+/* Systems map: dashes that drift along a live connection */
+@keyframes flow { to { stroke-dashoffset: -28; } }
+.edge-flow { animation: flow 1.6s linear infinite; }
+.edge-flow-slow { animation: flow 4s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .edge-flow, .edge-flow-slow { animation: none !important; }
+}
