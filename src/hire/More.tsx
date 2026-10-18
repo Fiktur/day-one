@@ -70,7 +70,7 @@ export function People() {
   const list = [
     { id: managerFor(h, ctx).id, role: 'Your manager' },
     ...(h.buddyId ? [{ id: h.buddyId, role: 'Your buddy for the first few weeks' }] : []),
-    { id: 'maria', role: 'People Experience · your go-to for onboarding' },
+    { id: 'maria', role: 'Onboarding team · your go-to for anything' },
     { id: h.recruiterId, role: 'Your recruiter, until day one' },
     { id: 'shuri', role: 'IT · laptop and accounts' },
   ]
@@ -153,7 +153,7 @@ export function SignIn() {
           <label className="text-xs text-muted" htmlFor="signin-code">Then enter the 6-digit code from your authenticator app</label>
           <div className="flex items-center gap-2 rounded-xl border border-line bg-surface px-3"><KeyRound className="h-4 w-4 text-faint" /><input id="signin-code" inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="123456" className="h-11 flex-1 bg-transparent font-mono text-[15px] tracking-[0.3em] outline-none" /></div>
           <Button variant="primary" size="md" className="w-full" type="submit">Sign in</Button>
-          <button type="button" onClick={() => toast('Recovery options: backup codes, or People Experience can verify you by video.')} className="w-full text-center text-xs text-muted">Lost your device?</button>
+          <button type="button" onClick={() => toast('Recovery options: backup codes, or the onboarding team can verify you by video.')} className="w-full text-center text-xs text-muted">Lost your device?</button>
         </form>
       )}
       <p className="flex items-center gap-1.5 text-[11px] text-faint"><Lock className="h-3 w-3" />Before day one you can't see anything restricted to employees.</p>
@@ -222,7 +222,7 @@ export function LaptopPage() {
   const options = ['MacBook Pro 14"', 'MacBook Pro 16"', 'ThinkPad X1 Carbon']
   const [pick, setPick] = useState(model)
   const track = [
-    { k: 'laptop_release', l: 'Ordered' },
+    { k: 'laptop_release', l: v.hire.rehire ? 'Reissued' : 'Ordered' },
     { k: 'laptop_prep', l: 'Set up for you' },
     { k: 'laptop_ship', l: 'Shipped' },
     { k: 'laptop_deliver', l: 'Delivered' },

@@ -5,7 +5,7 @@ import { cn } from '../../lib/cn'
 import { useNav } from '../../nav/NavContext'
 import { useDemo } from '../../engine/store'
 import { useViews } from '../../engine/selectors'
-import { SYSTEM_MODES, systemNames, type SystemId } from '../../data/journey'
+import { MODE_LABEL, SYSTEM_MODES, systemNames, type SystemId } from '../../data/journey'
 import { fmtShort } from '../../lib/dates'
 import { Button, Card, Glyph, Pill, ReqTag } from '../../ui/parts'
 import { Page, PageHeader } from '../StaffShell'
@@ -17,7 +17,7 @@ const SYSTEMS: Exclude<SystemId, 'dayone'>[] = ['greenhouse', 'workday', 'checkr
 
 const CONTRACT: Partial<Record<SystemId, { reads: string; writes: string; trigger: string; freq: string; owner: string; failure: string }>> = {
   greenhouse: { reads: 'Offer accepted, start date, role, location', writes: 'Nothing', trigger: 'Webhook on offer accepted', freq: 'Real time', owner: 'Recruiting', failure: 'Retries for 24 h. Duplicate events are recognised by event ID and ignored.' },
-  workday: { reads: 'Task status, hire record status', writes: 'Pre-hire record, confirmed details', trigger: 'Webhook + hourly check', freq: 'Within 1 h', owner: 'People Systems', failure: 'Shows “can’t check” after 2 missed checks. Never shows green without a confirmation.' },
+  workday: { reads: 'Task status, hire record status', writes: 'Pre-hire record, confirmed details', trigger: 'Webhook + hourly check', freq: 'Within 1 h', owner: 'HR Operations', failure: 'Shows “can’t check right now” after 2 missed checks. Never shows green without a confirmation.' },
   checkr: { reads: 'Check status only (never results)', writes: 'Order a check', trigger: 'Status check every 15 min', freq: '15 min', owner: 'Screening', failure: 'Marks affected checks “can’t check right now”. Retries every 5 min.' },
   firstbase: { reads: 'Order, preparation, shipment, delivery', writes: 'Release order, change address before shipping', trigger: 'Webhook', freq: 'Real time', owner: 'IT', failure: 'Retries; a backorder triggers a start-date forecast.' },
   google: { reads: 'Account created, first sign-in', writes: 'Nothing (IT creates accounts)', trigger: 'Directory events', freq: 'Real time', owner: 'IT', failure: 'Falls back to IT marking it done.' },
@@ -40,10 +40,7 @@ export function Systems() {
         sub="How each system connects, whether it's healthy, and what happens when it isn't."
         tags={<ReqTag ids="T1 T3 T7" />}
         right={
-          <>
-            <Segmented value={s.setup} onChange={(v) => s.setSetup(v)} options={[['connected', 'Connected'], ['manual', 'Manual-first']] as const} />
-            <Segmented value={tab} onChange={setTab} options={[['map', 'Live map'], ['connections', 'Connections'], ['log', 'Event log']] as const} />
-          </>
+          <Segmented value={tab} onChange={setTab} options={[['map', 'Live map'], ['connections', 'Connections'], ['log', 'Event log']] as const} />
         }
       />
       {tab === 'map' ? (
@@ -61,13 +58,13 @@ export function Systems() {
               return (
                 <button key={sys} type="button" onClick={() => setSel(sys)} className={cn('grid w-full items-center gap-3 border-b border-line px-4 py-2.5 text-left text-[13px] last:border-0 hover:bg-bg', compact ? 'grid-cols-[1fr_auto]' : 'grid-cols-[1fr_110px_1.3fr_90px_1fr]', down && 'bg-red-soft/70 hover:bg-red-soft', sel === sys && 'ring-1 ring-inset ring-accent/40')}>
                   <span className="font-medium">{systemNames[sys]}</span>
-                  {!compact && <span className="flex items-center gap-1.5 text-muted"><Icon className="h-3.5 w-3.5" />{mode}</span>}
+                  {!compact && <span className="flex items-center gap-1.5 text-muted"><Icon className="h-3.5 w-3.5" />{MODE_LABEL[mode]}</span>}
                   <span className="flex items-center gap-1.5">
                     <Glyph state={down ? 'late' : mode === 'manual' ? 'na' : 'verified'} size={12} />
-                    {down ? `Not responding since ${fmtShort(s.down[sys]!)}` : mode === 'manual' ? 'Owners mark steps done' : mode === 'linked' ? 'Healthy · a person confirms' : 'Healthy'}
+                    {down ? `Not responding since ${fmtShort(s.down[sys]!)}` : mode === 'manual' ? 'Owner marks done' : mode === 'linked' ? 'Healthy · a person confirms' : 'Healthy'}
                   </span>
                   {!compact && <span className="font-mono text-[11px] text-muted">{ev ? ev.time.slice(0, 5) : '—'}</span>}
-                  {!compact && <span className={cn('text-xs', n ? 'font-medium text-red' : 'text-muted')}>{n ? `${n} step${n > 1 ? 's' : ''} show “can't check”` : '—'}</span>}
+                  {!compact && <span className={cn('text-xs', n ? 'font-medium text-red' : 'text-muted')}>{n ? `${n} step${n > 1 ? 's' : ''} show “can't check right now”` : '—'}</span>}
                 </button>
               )
             })}
@@ -103,7 +100,7 @@ function SystemDetail({ sel }: { sel: MapNode }) {
         <p className="text-[13px] text-muted">
           {sel === 'hire'
             ? 'The Day One app: their next step, what is being handled, the welcome board and the assistant. Tasks in Workday or Checkr link out; Day One never stores their documents.'
-            : 'Each owner gets only their own next step, with a due date, plus a nudge before anything turns red. Program managers see every hand-off.'}
+            : 'Each owner gets only their own next step, with a due date, plus a nudge before anything turns red. The onboarding team sees every hand-off.'}
         </p>
       </Card>
     )
@@ -138,8 +135,8 @@ function MapTab({ sel, setSel }: { sel: MapNode; setSel: (n: MapNode) => void })
   const live = SYSTEMS.filter((x) => SYSTEM_MODES[s.setup][x] === 'connected' && s.down[x] == null).length
   const stats = [
     { label: 'Events today', value: s.log.filter((l) => l.day === s.now).length, emoji: 'bell' as const },
-    { label: 'Live connections', value: live, suffix: ` of ${SYSTEMS.length}`, emoji: 'plug' as const },
-    { label: 'Waiting on a system', value: steps.filter((x) => x.state === 'confirming').length, emoji: 'hourglass' as const },
+    { label: 'Automatic connections', value: live, suffix: ` of ${SYSTEMS.length}`, emoji: 'plug' as const },
+    { label: 'Waiting to confirm', value: steps.filter((x) => x.state === 'confirming').length, emoji: 'hourglass' as const },
     { label: "Can't check right now", value: steps.filter((x) => x.state === 'unknown').length, emoji: 'warning' as const, tone: 'red' as const },
   ]
   return (

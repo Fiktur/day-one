@@ -9,7 +9,8 @@ import { fmtDay } from '../../lib/dates'
 import { Avatar, Glyph, ReqTag, SourceBadge } from '../../ui/parts'
 import { StepActions } from '../../ui/StepRow'
 import { Page, PageHeader } from '../StaffShell'
-import { forwardRef, useId } from 'react'
+import { forwardRef, useId, type ReactNode } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { AnimatePresence, LayoutGroup, Num, motion, springs } from '../../ui/motion'
 import { Emoji, type EmojiName } from '../../ui/assets'
 
@@ -17,43 +18,84 @@ export function Queue() {
   const { person, compact, go } = useNav()
   const views = useViews()
   const now = useDemo((s) => s.now)
-  const setup = useDemo((s) => s.setup)
   const team = person.team ?? 'it'
   const groupId = useId()
   const q = queueFor(views, { team }, now)
-  const cols: { k: keyof typeof q; label: string; hint: string; emoji: EmojiName }[] = [
-    { k: 'move', label: 'Your move', hint: 'Ready to start, sorted by urgency', emoji: 'target' },
-    { k: 'coming', label: 'Coming up', hint: 'Waiting on earlier steps', emoji: 'hourglass' },
-    { k: 'confirming', label: 'Confirming', hint: 'Done, waiting on a system', emoji: 'magnifier' },
-    { k: 'done', label: 'Done this week', hint: 'With the date it really happened', emoji: 'check' },
-  ]
+  const viewer = { role: person.role, team: person.team }
+  // "Your move" always shows, so an empty queue reads as good news; the other column only when it has cards.
+  const cols = ([
+    { k: 'move', label: 'Your move', emoji: 'target' },
+    { k: 'confirming', label: 'Waiting to confirm', emoji: 'magnifier' },
+  ] as { k: 'move' | 'confirming'; label: string; emoji: EmojiName }[]).filter((c) => c.k === 'move' || q[c.k].length > 0)
+  const coming = Object.values(
+    q.coming.reduce<Record<string, { name: string; n: number; open: number | null }>>((acc, x) => {
+      const name = safeName(x.step, viewer, { action: true })
+      const g = (acc[name] ??= { name, n: 0, open: null })
+      g.n++
+      if (x.step.open != null && (g.open == null || x.step.open < g.open)) g.open = x.step.open
+      return acc
+    }, {}),
+  )
   return (
     <Page>
       <PageHeader
         title={teams[team].name}
-        sub={`What can we start on today? ${teams[team].members.length > 1 ? `Shared by ${teams[team].members.length} people.` : ''} ${setup === 'manual' ? 'Manual-first setup: you mark steps done, with the real date.' : 'Connected setup: most steps update on their own.'}`}
+        sub={`What can we start on today?${teams[team].members.length > 1 ? ` Shared by ${teams[team].members.length} people.` : ''}`}
         tags={<ReqTag ids="O5 O7 O4" />}
       />
       <LayoutGroup id={groupId}>
-      <div className={cn('grid gap-3', compact ? 'grid-cols-1' : 'grid-cols-4')}>
-        {cols.map((c) => (
-          <section key={c.k} className="min-w-0">
-            <div className="mb-2 flex items-center justify-between rounded-2xl bg-surface/60 px-2 py-1.5 ring-1 ring-line/70 backdrop-blur">
-              <span className="flex items-center gap-1.5 text-[12px] font-semibold"><Emoji name={c.emoji} size={20} />{c.label}</span>
-              <span className={cn('grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[11px] font-bold', c.k === 'move' && q.move.length ? 'bg-amber-soft text-amber-ink' : 'bg-sunken text-muted')}><Num value={q[c.k].length} /></span>
-            </div>
-            <div className="space-y-2">
-              {q[c.k].length === 0 && <div className="rounded-2xl border border-dashed border-line px-3 py-5 text-center text-xs text-faint"><Emoji name={c.k === 'move' ? 'party' : 'sparkles'} size={28} float className="mx-auto mb-1" />{c.k === 'move' ? 'Nothing waiting on you' : 'Nothing here'}</div>}
-              <AnimatePresence mode="popLayout">
-                {(c.k === 'coming' ? q[c.k].slice(0, compact ? 3 : 8) : q[c.k]).map((x) => <QCard key={x.view.hire.id + x.step.key} x={x} col={c.k} onOpen={() => go({ name: 'hire', hireId: x.view.hire.id })} />)}
-              </AnimatePresence>
-              {c.k === 'coming' && q.coming.length > 8 && !compact && <div className="px-1 text-xs text-faint">+{q.coming.length - 8} more</div>}
-            </div>
-          </section>
-        ))}
-      </div>
+        <div className={cn('grid gap-3', !compact && cols.length > 1 && 'grid-cols-2')}>
+          {cols.map((c) => (
+            <section key={c.k} className="min-w-0">
+              <div className="mb-2 flex items-center justify-between rounded-2xl bg-surface/60 px-2 py-1.5 ring-1 ring-line/70 backdrop-blur">
+                <span className="flex items-center gap-1.5 text-[12px] font-semibold"><Emoji name={c.emoji} size={20} />{c.label}</span>
+                <span className={cn('grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[11px] font-bold', c.k === 'move' && q.move.length ? 'bg-amber-soft text-amber-ink' : 'bg-sunken text-muted')}><Num value={q[c.k].length} /></span>
+              </div>
+              <div className={cn('gap-2', !compact && cols.length === 1 ? 'grid grid-cols-2 xl:grid-cols-3' : 'space-y-2')}>
+                {q[c.k].length === 0 && <div className="col-span-full rounded-2xl border border-dashed border-line px-3 py-5 text-center text-xs text-faint"><Emoji name="party" size={28} float className="mx-auto mb-1" />Nothing waiting on you</div>}
+                <AnimatePresence mode="popLayout">
+                  {q[c.k].map((x) => <QCard key={x.view.hire.id + x.step.key} x={x} col={c.k} onOpen={() => go({ name: 'hire', hireId: x.view.hire.id })} />)}
+                </AnimatePresence>
+              </div>
+            </section>
+          ))}
+        </div>
       </LayoutGroup>
+      <div className={cn('mt-4 grid items-start gap-3', !compact && 'grid-cols-2')}>
+        {coming.length > 0 && (
+          <Fold emoji="hourglass" title="Coming up" note={`${q.coming.length} steps waiting on earlier ones`}>
+            {coming.map((g) => (
+              <li key={g.name} className="flex items-baseline justify-between gap-3">
+                <span className="truncate">{g.name} <span className="text-muted">× {g.n}</span></span>
+                <span className="shrink-0 text-xs text-muted tnum">{g.open != null && g.open > now ? `first opens ${fmtDay(g.open)}` : 'after earlier steps'}</span>
+              </li>
+            ))}
+          </Fold>
+        )}
+        {q.done.length > 0 && (
+          <Fold emoji="check" title="Done this week" note={String(q.done.length)}>
+            {q.done.map(({ view, step }) => (
+              <li key={view.hire.id + step.key} className="flex items-baseline justify-between gap-3">
+                <span className="truncate"><span className="font-medium">{view.person.name}</span> · {safeName(step, viewer)}</span>
+                <span className="shrink-0 text-xs text-muted tnum" title={step.doneRecorded != null && step.done != null && step.doneRecorded !== step.done ? `Recorded ${fmtDay(step.doneRecorded)}` : undefined}>{fmtDay(step.done ?? step.ver!)}</span>
+              </li>
+            ))}
+          </Fold>
+        )}
+      </div>
     </Page>
+  )
+}
+
+function Fold({ emoji, title, note, children }: { emoji: EmojiName; title: string; note: string; children: ReactNode }) {
+  return (
+    <details className="group rounded-2xl border border-line bg-surface px-3 py-2 text-[13px]">
+      <summary className="flex cursor-pointer list-none items-center gap-1.5 font-semibold">
+        <Emoji name={emoji} size={18} />{title}<span className="font-normal text-muted">· {note}</span>
+        <ChevronDown className="ml-auto h-3.5 w-3.5 text-muted transition group-open:rotate-180" />
+      </summary>
+      <ul className="mt-2 space-y-1">{children}</ul>
+    </details>
   )
 }
 
@@ -77,16 +119,16 @@ const QCard = forwardRef<HTMLDivElement, { x: QueueItem; col: string; onOpen: ()
       <button type="button" onClick={onOpen} className="flex w-full items-center gap-2 text-left">
         <Avatar id={x.view.hire.id} size={22} />
         <span className="min-w-0 flex-1 truncate font-semibold">{x.view.person.name}</span>
-        <Glyph state={col === 'done' ? 'verified' : col === 'coming' ? 'blank' : s.state} red={s.red} size={12} />
+        <Glyph state={s.state} red={s.red} size={12} />
       </button>
-      <div className={cn('mt-1.5', col === 'coming' && 'text-muted')}>{safeName(s, { role: person.role, team: person.team })}</div>
+      <div className="mt-1.5">{safeName(s, { role: person.role, team: person.team }, { action: col === 'move' })}</div>
       <div className={cn('mt-0.5 text-xs', s.red ? 'font-medium text-red' : 'text-muted')}>
-        {col === 'done' ? (s.doneRecorded != null && s.done != null && s.doneRecorded !== s.done ? `Happened ${fmtDay(s.done)} · recorded ${fmtDay(s.doneRecorded)}` : `Done ${fmtDay(s.ver!)}`) : s.label}
+        {s.label}
         {col === 'move' && s.def.critical ? ` · starts ${fmtDay(x.view.hire.start)}` : ''}
       </div>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
         <SourceBadge system={s.def.system} mode={s.mode} />
-        {(col === 'move') && <StepActions view={x.view} step={s} />}
+        {col === 'move' && <StepActions view={x.view} step={s} />}
       </div>
     </motion.div>
   )

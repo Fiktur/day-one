@@ -27,6 +27,14 @@ export function ManagerHire() {
   const msgs = messagesFor(v, ctx, edits).filter((m) => m.template.from === 'manager' || m.template.from === 'buddy')
   const ball = v.balls.find((b) => b.holder?.id !== viewer) ?? v.primary
   const editingMsg = msgs.find((m) => m.key === editing)
+  const withdrawn = v.status === 'withdrawn'
+  // Some hires did their board steps before the studio existed; fall back to the steps so the card never says "Not started" over a done step.
+  const boardSteps = [v.by.hello, v.by.board_invite].filter(Boolean)
+  const boardLine = board
+    ? `${board.status === 'live' ? `Shared ${fmtShort(board.shared!)}` : 'Draft'} · ${board.posts.length} posts · ${board.invites.filter((i) => i.status === 'invited').length} invites waiting`
+    : boardSteps.some((x) => x!.state === 'verified')
+      ? boardSteps.map((x) => `${x!.key === 'hello' ? 'Hello' : 'Invites'} ${x!.state === 'verified' ? `done ${fmtShort(x!.ver!)}` : 'not yet'}`).join(' · ')
+      : 'Not started'
 
   return (
     <Page>
@@ -42,17 +50,21 @@ export function ManagerHire() {
         <StatusPill status={v.status} className="text-[13px]" />
       </div>
 
-      <Card className="mb-4 p-4">
-        <StageTrack stage={v.stage} labels />
-        {ball?.holder && (
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px]">
-            <span className="text-muted">Who has the ball:</span>
-            <BallChip step={ball} now={now} />
-            <span>{safeName(ball, { role: person.role })}</span>
-            <span className={cn('text-xs', ball.red ? 'text-red' : 'text-muted')}>· {lc(ball.label)}</span>
-          </div>
-        )}
-      </Card>
+      {withdrawn ? (
+        <Card className="mb-4 p-4 text-[13px]"><span className="font-semibold">{v.person.name.split(' ')[0]} withdrew on {fmtDay(v.hire.withdrawn!)}.</span> <span className="text-muted">Nothing is waiting on you. Scheduled messages stopped and open steps closed.</span></Card>
+      ) : (
+        <Card className="mb-4 p-4">
+          <StageTrack stage={v.stage} labels />
+          {ball?.holder && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px]">
+              <span className="text-muted">Waiting on</span>
+              <BallChip step={ball} now={now} />
+              <span>{safeName(ball, { role: person.role }, { action: true })}</span>
+              <span className={cn('text-xs', ball.red ? 'text-red' : 'text-muted')}>· {lc(ball.label)}</span>
+            </div>
+          )}
+        </Card>
+      )}
 
       <div className={cn('mb-4 grid gap-3', compact ? 'grid-cols-2' : 'grid-cols-4')}>
         {v.areas.map((a) => (
@@ -79,7 +91,7 @@ export function ManagerHire() {
               step={s}
               showSource={false}
               showHolder={false}
-              actions={(s.key === 'hello' || s.key === 'board_invite') && s.state !== 'verified' && s.state !== 'blank' ? <Button size="xs" variant="primary" onClick={() => go({ name: 'studio', hireId: v.hire.id })}>{s.key === 'hello' ? 'Record' : 'Invite'}</Button> : undefined}
+              actions={(s.key === 'hello' || s.key === 'board_invite') && (s.state === 'open' || s.state === 'soon' || s.state === 'late') ? <Button size="xs" variant="primary" onClick={() => go({ name: 'studio', hireId: v.hire.id })}>{s.key === 'hello' ? 'Record' : 'Invite'}</Button> : undefined}
             />
           ))}
         </Card>
@@ -92,7 +104,7 @@ export function ManagerHire() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="truncate text-[13px] font-semibold">{m.subject}</div>
-                      <div className="text-xs text-muted">{m.status === 'sent' ? `Sent ${fmtDay(m.day!)}` : m.day != null ? `${fmtDay(m.day)} · 9:00 am ${v.person.name.split(' ')[0]}'s time` : 'Waiting'} · from {m.from}</div>
+                      <div className="text-xs text-muted">{m.status === 'sent' ? `Sent ${fmtDay(m.day!)}` : m.status === 'stopped' ? 'Stopped: offer withdrawn' : m.day != null ? `${fmtDay(m.day)} · 9:00 am ${v.person.name.split(' ')[0]}'s time` : m.template.from === 'buddy' ? 'Sends once you pick a buddy' : 'Waiting'} · from {m.from}</div>
                     </div>
                     {m.edited && <span className="rounded bg-accent-soft px-1.5 py-0.5 text-[10px] font-semibold text-accent">Edited</span>}
                   </div>
@@ -112,9 +124,9 @@ export function ManagerHire() {
           <Card className="p-4">
             <div className="flex items-center justify-between">
               <h2 className="font-display text-base font-bold">Welcome board</h2>
-              <Button size="xs" onClick={() => go({ name: 'studio', hireId: v.hire.id })}>Open studio</Button>
+              {!withdrawn && <Button size="xs" onClick={() => go({ name: 'studio', hireId: v.hire.id })}>Open studio</Button>}
             </div>
-            <p className="mt-1 text-xs text-muted">{board ? `${board.status === 'live' ? `Shared ${fmtShort(board.shared!)}` : 'Draft'} · ${board.posts.length} posts · ${board.invites.filter((i) => i.status === 'invited').length} invites waiting` : 'Not started'}</p>
+            <p className="mt-1 text-xs text-muted">{boardLine}</p>
             <div className="mt-2 flex -space-x-1.5">
               {(board?.invites ?? []).map((i) => <span key={i.person} className={cn('rounded-full ring-2 ring-surface', i.status === 'invited' && 'opacity-50')}><Avatar id={i.person} size={24} /></span>)}
             </div>

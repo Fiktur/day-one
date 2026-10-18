@@ -4,11 +4,12 @@ import { fmtDay, fmtShort, rel } from '../../lib/dates'
 /** One-line, privacy-safe summary of each readiness area, for managers and recruiters. */
 export function areaSummary(v: HireView, a: AreaView, now: number): string {
   const b = v.by
+  if (v.status === 'withdrawn') return a.done ? `Stopped at ${a.done} of ${a.total} done when the offer was withdrawn.` : 'Stopped when the offer was withdrawn.'
   switch (a.id) {
     case 'employment': {
       if (b.permit && b.permit.state !== 'na' && b.permit.state !== 'verified') return `Work authorization in progress${b.permit.eta ? `, expected ${fmtShort(b.permit.eta)}` : ''}.`
       if (b.bg_complete?.state === 'unknown') return "Background check: can't check right now."
-      if (b.clearance?.state === 'verified') return 'Clearance complete. Details stay with Screening.'
+      if (b.clearance?.state === 'verified') return 'Clearance complete. Details stay with Background screening.'
       if (b.consent && b.consent.state !== 'verified') return 'Waiting on the hire to give background check consent.'
       return 'Background check in progress.'
     }

@@ -3,9 +3,9 @@ import { animate, motion, useMotionValue, useReducedMotion, useTransform, Animat
 import { cn } from '../../lib/cn'
 import { useDemo } from '../../engine/store'
 import { useViews } from '../../engine/selectors'
-import { SYSTEM_MODES, systemNames, type Mode, type SystemId } from '../../data/journey'
+import { MODE_LABEL, SYSTEM_MODES, systemNames, type Mode, type SystemId } from '../../data/journey'
 import type { LogEntry } from '../../engine/log'
-import { Emoji, type EmojiName } from '../../ui/assets'
+import { Emoji, SYSTEM_EMOJI as E, type EmojiName } from '../../ui/assets'
 import { Num, springs } from '../../ui/motion'
 
 export type MapNode = Exclude<SystemId, 'dayone'> | 'hire' | 'team'
@@ -15,15 +15,15 @@ const RIGHT: MapNode[] = ['firstbase', 'google', 'calendar', 'benefits', 'badge'
 export const MAP_SYSTEMS = [...LEFT, ...RIGHT] as Exclude<SystemId, 'dayone'>[]
 
 export const NODE_META: Record<MapNode, { emoji: EmojiName; role: string; name: string; short?: string }> = {
-  greenhouse: { emoji: 'seedling', role: 'Offers in', name: 'Greenhouse' },
-  workday: { emoji: 'id', role: 'HR record and tasks', name: 'Workday' },
-  checkr: { emoji: 'shield', role: 'Background checks', name: 'Checkr' },
-  immigration: { emoji: 'globe', role: 'Work permits', name: 'Atlas Immigration', short: 'Atlas' },
-  firstbase: { emoji: 'laptop', role: 'Laptops', name: 'Firstbase' },
-  google: { emoji: 'key', role: 'Work accounts', name: 'Google Workspace', short: 'Google' },
-  calendar: { emoji: 'calendar', role: 'Invites', name: 'Calendar' },
-  benefits: { emoji: 'heart', role: 'Enrollment', name: 'Benefits site', short: 'Benefits' },
-  badge: { emoji: 'office', role: 'Badges', name: 'Badge desk' },
+  greenhouse: { emoji: E.greenhouse, role: 'Offers in', name: 'Greenhouse' },
+  workday: { emoji: E.workday, role: 'HR record and tasks', name: 'Workday' },
+  checkr: { emoji: E.checkr, role: 'Background checks', name: 'Checkr' },
+  immigration: { emoji: E.immigration, role: 'Work permits', name: 'Atlas Legal', short: 'Atlas' },
+  firstbase: { emoji: E.firstbase, role: 'Laptops', name: 'Firstbase' },
+  google: { emoji: E.google, role: 'Work accounts', name: 'Google Workspace', short: 'Google' },
+  calendar: { emoji: E.calendar, role: 'Invites', name: 'Calendar' },
+  benefits: { emoji: E.benefits, role: 'Enrollment', name: 'Benefits portal', short: 'Benefits' },
+  badge: { emoji: E.badge, role: 'Badges', name: 'Badge system', short: 'Badges' },
   hire: { emoji: 'wave', role: 'Day One app', name: 'New hires' },
   team: { emoji: 'people', role: 'Tasks and alerts', name: 'Managers and teams', short: 'Teams' },
 }
@@ -319,7 +319,7 @@ export function SystemsMap({ selected, onSelect }: { selected: MapNode; onSelect
             const dn = isDown(n)
             const last = lastFor(n)
             const unk = unknownFor(n)
-            const status = dn ? (unk ? `Down · ${unk} can't check` : 'Down · retrying') : m === 'connected' ? `Live API${last ? ` · ${last.time.slice(0, 5)}` : ''}` : m === 'linked' ? 'Linked · a person confirms' : m === 'manual' ? 'Manual · owner marks done' : meta.role
+            const status = dn ? (unk ? `Down · ${unk} can't check right now` : 'Down · retrying') : m === 'connected' ? `Automatic${last ? ` · ${last.time.slice(0, 5)}` : ''}` : m === 'linked' || m === 'manual' ? MODE_LABEL[m] : meta.role
             return (
               <motion.button
                 key={n}
@@ -343,7 +343,7 @@ export function SystemsMap({ selected, onSelect }: { selected: MapNode; onSelect
                 </motion.span>
                 <span className="min-w-0 flex-1 leading-tight">
                   <span className={cn('block truncate font-semibold', L.narrow ? 'text-[12px]' : 'text-[13px]')}>{L.narrow ? meta.short ?? meta.name : meta.name}</span>
-                  <span className={cn('block truncate', L.narrow ? 'text-[10px]' : 'text-[11px]', dn ? 'font-medium text-red' : 'text-muted')}>{L.narrow ? (dn ? 'Down · retrying' : m === 'connected' ? 'Live' : m === 'linked' ? 'Linked' : m === 'manual' ? 'Manual' : meta.role) : status}</span>
+                  <span className={cn('block truncate', L.narrow ? 'text-[10px]' : 'text-[11px]', dn ? 'font-medium text-red' : 'text-muted')}>{L.narrow ? (dn ? 'Down · retrying' : m === 'connected' || m === 'linked' || m === 'manual' ? MODE_LABEL[m] : meta.role) : status}</span>
                 </span>
                 <span className={cn('absolute right-2 top-2 h-2 w-2 rounded-full', dn ? 'bg-red' : m === 'connected' || m === 'people' ? 'bg-green' : m === 'linked' ? 'bg-accent' : 'bg-faint')} />
               </motion.button>
@@ -381,9 +381,9 @@ export function MapLegend({ className }: { className?: string }) {
   )
   return (
     <div className={cn('flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-muted', className)}>
-      {item(<line x1="2" y1="4" x2="26" y2="4" stroke="rgb(var(--accent))" strokeWidth="2" strokeDasharray="3 5" strokeLinecap="round" />, 'Live API')}
-      {item(<line x1="2" y1="4" x2="26" y2="4" stroke="rgb(var(--faint))" strokeWidth="2" strokeDasharray="7 5" />, 'Linked: a person confirms')}
-      {item(<line x1="2" y1="4" x2="26" y2="4" stroke="rgb(var(--faint))" strokeWidth="2" strokeDasharray="2 5" strokeLinecap="round" />, 'Manual: owner marks done')}
+      {item(<line x1="2" y1="4" x2="26" y2="4" stroke="rgb(var(--accent))" strokeWidth="2" strokeDasharray="3 5" strokeLinecap="round" />, MODE_LABEL.connected)}
+      {item(<line x1="2" y1="4" x2="26" y2="4" stroke="rgb(var(--faint))" strokeWidth="2" strokeDasharray="7 5" />, MODE_LABEL.linked)}
+      {item(<line x1="2" y1="4" x2="26" y2="4" stroke="rgb(var(--faint))" strokeWidth="2" strokeDasharray="2 5" strokeLinecap="round" />, MODE_LABEL.manual)}
       {item(<line x1="2" y1="4" x2="26" y2="4" stroke="rgb(var(--red))" strokeWidth="2" strokeDasharray="6 4" />, 'Down: retrying')}
       <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-green" />Event confirmed</span>
       <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber" />Warning</span>

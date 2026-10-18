@@ -23,14 +23,14 @@ const remoteRun: RunItem[] = [
   { time: '9:30', title: 'Get set up', who: 'Shuri', confirmed: true },
   { time: '10:30', title: 'Benefits, explained', who: 'Total Rewards team', confirmed: false },
   { time: '11:30', title: 'Meet your buddy', who: 'Buddies', confirmed: true },
-  { time: '12:00', title: 'Questions with People Experience', who: 'Maria Hill', confirmed: true },
+  { time: '12:00', title: 'Questions with the onboarding team', who: 'Maria Hill', confirmed: true },
 ]
 const officeRun: RunItem[] = [
   { time: '9:00', title: 'Breakfast and badges', who: 'Luke Cage', confirmed: true },
   { time: '9:30', title: 'Welcome to Northbeam', who: 'Pepper Potts (video)', confirmed: true },
   { time: '10:00', title: 'Get set up', who: 'Felicity Smoak', confirmed: true },
   { time: '11:00', title: 'Office tour', who: 'Luke Cage', confirmed: true },
-  { time: '11:30', title: 'Questions with People Experience', who: 'Alfred Pennyworth', confirmed: false },
+  { time: '11:30', title: 'Questions with the onboarding team', who: 'Alfred Pennyworth', confirmed: false },
 ]
 
 export const SESSIONS: Session[] = [

@@ -6,7 +6,7 @@ import { cn, lc } from '../../lib/cn'
 import { useNav } from '../../nav/NavContext'
 import { useDemo } from '../../engine/store'
 import { useViews, orderedHires } from '../../engine/selectors'
-import { safeName, type HireView } from '../../engine/derive'
+import { refName, safeName, type HireView } from '../../engine/derive'
 import { STAGES } from '../../data/journey'
 import { people } from '../../data/people'
 import { fmtDay, fmtShort } from '../../lib/dates'
@@ -21,14 +21,14 @@ export function Candidates() {
   const list = orderedHires(views).filter((v) => v.status !== 'started')
   const [sel, setSel] = useState<string>('wanda')
   const [filter, setFilter] = useState<'all' | 'attention' | 'soon'>('all')
-  const shown = list.filter((v) => (filter === 'attention' ? v.status === 'atrisk' || v.status === 'unknown' || v.dateMoved : filter === 'soon' ? v.hire.start - now <= 30 : true))
+  const shown = list.filter((v) => (filter === 'attention' ? v.status === 'atrisk' || v.status === 'behind' || v.status === 'unknown' || v.dateMoved : filter === 'soon' ? v.hire.start - now <= 30 : true))
   const current = views[sel]
 
   return (
     <Page>
       <PageHeader
         title="Accepted offers"
-        sub="Where every candidate is, without asking People Ops."
+        sub="Where every accepted offer stands, without chasing anyone."
         tags={<ReqTag ids="M1 T5" />}
         right={
           <Segmented value={filter} onChange={setFilter} options={[['all', 'All'], ['attention', 'Needs attention'], ['soon', 'Starting in 30 days']] as const} />
@@ -37,8 +37,8 @@ export function Candidates() {
       <div className={cn('grid gap-4', compact ? 'grid-cols-1' : 'grid-cols-[minmax(0,1.7fr)_minmax(280px,1fr)]')}>
         <Card className="overflow-hidden">
           {!compact && (
-            <div className="grid grid-cols-[minmax(0,1.4fr)_90px_100px_minmax(0,1.3fr)_110px] gap-3 border-b border-line bg-bg px-4 py-2 font-mono text-[10px] uppercase tracking-wider text-faint">
-              <span>Hire</span><span>Starts</span><span>Where</span><span>Ball</span><span>Flag</span>
+            <div className="grid grid-cols-[minmax(0,1.1fr)_64px_96px_minmax(0,1.6fr)_76px] gap-3 border-b border-line bg-bg px-4 py-2 font-mono text-[10px] uppercase tracking-wider text-faint">
+              <span>Hire</span><span>Starts</span><span>Stage</span><span>Waiting on</span><span>Status</span>
             </div>
           )}
           {shown.map((v) => <Row key={v.hire.id} v={v} selected={sel === v.hire.id} onSelect={() => setSel(v.hire.id)} compact={compact} />)}
@@ -52,7 +52,7 @@ export function Candidates() {
 function Row({ v, selected, onSelect, compact }: { v: HireView; selected: boolean; onSelect: () => void; compact: boolean }) {
   const now = useDemo((s) => s.now)
   const flash = useDemo((s) => `${v.hire.id}:start` in s.flashes)
-  const flag = v.status === 'atrisk' ? <Pill tone="red">At risk</Pill> : v.status === 'unknown' ? <Pill tone="dashed">Can't check</Pill> : v.status === 'withdrawn' ? <Pill>Withdrawn</Pill> : v.dateMoved ? <Pill tone="amber">Date moved</Pill> : <span className="text-xs text-faint">—</span>
+  const flag = v.status === 'atrisk' ? <Pill tone="red">At risk</Pill> : v.status === 'behind' ? <Pill tone="amber">Behind</Pill> : v.status === 'unknown' ? <Pill tone="dashed">Can't check right now</Pill> : v.status === 'withdrawn' ? <Pill>Withdrawn</Pill> : v.dateMoved ? <Pill tone="amber">Date moved</Pill> : <span className="text-xs text-faint">—</span>
   if (compact) {
     return (
       <button type="button" onClick={onSelect} className={cn('flex w-full items-center gap-3 border-b border-line px-3 py-2.5 text-left last:border-0', selected && 'bg-accent-soft', flash && 'animate-flash')}>
@@ -63,10 +63,10 @@ function Row({ v, selected, onSelect, compact }: { v: HireView; selected: boolea
     )
   }
   return (
-    <button type="button" onClick={onSelect} className={cn('grid w-full grid-cols-[minmax(0,1.4fr)_90px_100px_minmax(0,1.3fr)_110px] items-center gap-3 border-b border-line px-4 py-2.5 text-left last:border-0 hover:bg-bg', selected && 'bg-accent-soft hover:bg-accent-soft', flash && 'animate-flash')}>
+    <button type="button" onClick={onSelect} className={cn('grid w-full grid-cols-[minmax(0,1.1fr)_64px_96px_minmax(0,1.6fr)_76px] items-center gap-3 border-b border-line px-4 py-2.5 text-left last:border-0 hover:bg-bg', selected && 'bg-accent-soft hover:bg-accent-soft', flash && 'animate-flash')}>
       <span className="flex min-w-0 items-center gap-2"><Avatar id={v.hire.id} size={26} /><span className="min-w-0"><span className="block truncate text-[13px] font-medium">{v.person.name}</span><span className="block truncate text-xs text-muted">{v.hire.title}</span></span></span>
       <span className="text-[13px] tnum">{v.status === 'withdrawn' ? '—' : fmtShort(v.hire.start)}{v.dateMoved && <span className="block text-[11px] text-muted">was {fmtShort(v.hire.originalStart)}</span>}</span>
-      <StageTrack stage={v.stage} width={90} />
+      <StageTrack stage={v.stage} width={88} />
       <span className="min-w-0">{v.primary ? <BallChip step={v.primary} now={now} size="sm" /> : <span className="text-xs text-faint">—</span>}</span>
       <span>{flag}</span>
     </button>
@@ -90,7 +90,7 @@ function Drawer({ v }: { v: HireView }) {
       <div>
         <div className="text-xs text-muted">Stage</div>
         <div className="font-medium">{STAGES[v.stage]}</div>
-        <div className="mt-1.5"><StageTrack stage={v.stage} labels /></div>
+        <div className="mt-1.5"><StageTrack stage={v.stage} /></div>
       </div>
       <div className="space-y-1.5">
         <div className="text-xs text-muted">Happening now</div>
@@ -98,7 +98,7 @@ function Drawer({ v }: { v: HireView }) {
         {active.map((s) => (
           <div key={s.key} className={cn('rounded-lg px-2.5 py-2 text-[13px]', s.red ? 'bg-red-soft' : 'bg-bg')}>
             <div className="font-medium">{safeName(s, viewerCtx)}</div>
-            <div className={cn('text-xs', s.red ? 'text-red' : 'text-muted')}>{s.holder?.name} · {lc(s.label)}</div>
+            <div className={cn('text-xs', s.red ? 'text-red' : 'text-muted')}>{s.holder ? `Waiting on ${refName(s.holder)} · ` : ''}{lc(s.label)}</div>
           </div>
         ))}
       </div>

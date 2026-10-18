@@ -1,16 +1,16 @@
 import { forwardRef, useEffect, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import { springs } from './motion'
-import { Emoji, TEAM_EMOJI, avatarUri } from './assets'
+import { Emoji, SYSTEM_EMOJI, TEAM_EMOJI, avatarUri } from './assets'
 import * as Tip from '@radix-ui/react-tooltip'
 import { Check, Link2, Plug, Hand, Sparkles } from 'lucide-react'
 import { cn } from '../lib/cn'
 import { people } from '../data/people'
 import type { Mode, SystemId } from '../data/journey'
-import { systemNames } from '../data/journey'
+import { MODE_LABEL, systemNames } from '../data/journey'
 import type { AreaView, HireStatus, Ref, StepState, StepView } from '../engine/derive'
-import { STATUS_LABEL } from '../engine/derive'
-import { STAGE_SHORT } from '../data/journey'
+import { STATUS_LABEL, refName } from '../engine/derive'
+import { STAGES } from '../data/journey'
 import { REQS } from '../data/reqs'
 import { useDemo } from '../engine/store'
 import { heldFor } from '../lib/dates'
@@ -36,10 +36,10 @@ export function Glyph({ state, red, size = 14, className, pulse }: { state: Glyp
   let bg: React.CSSProperties | undefined
   switch (s) {
     case 'verified': cls = 'bg-green text-surface'; label = 'Verified'; inner = check; break
-    case 'confirming': cls = 'border-2 border-green text-green bg-surface'; label = 'Done, confirming'; inner = check; break
+    case 'confirming': cls = 'border-2 border-green text-green bg-surface'; label = 'Done, waiting to confirm'; inner = check; break
     case 'open': cls = cn('bg-amber', pulse && 'halo-amber'); label = 'Due now'; break
     case 'soon':
-    case 'late': cls = cn('bg-red', pulse && 'halo-red'); label = s === 'late' ? 'Late' : 'About to be late'; break
+    case 'late': cls = cn('bg-red', pulse && 'halo-red'); label = s === 'late' ? 'Overdue' : 'About to be overdue'; break
     case 'unknown': cls = 'border-[1.5px] border-dashed border-muted'; label = "Can't check right now"; break
     case 'na': cls = 'border-[1.5px] border-faint bg-sunken'; label = 'Not needed'; inner = <span className="block h-[1.5px] w-1/2 bg-faint" />; break
     case 'prog': cls = 'border-2 border-accent'; label = 'In progress'; bg = { background: 'conic-gradient(rgb(var(--accent)) 0 50%, transparent 50% 100%)' }; break
@@ -84,10 +84,11 @@ export function Avatar({ id, refObj, size = 28, className }: { id?: string; refO
       </span>
     )
   }
-  if (r.kind === 'team' && TEAM_EMOJI[r.id]) {
+  const emoji = r.kind === 'team' ? TEAM_EMOJI[r.id] : r.kind === 'provider' ? SYSTEM_EMOJI[r.id] : undefined
+  if (emoji) {
     return (
       <span aria-hidden className={cn('inline-grid shrink-0 place-items-center rounded-[30%] border border-line bg-surface', className)} style={{ width: size, height: size }}>
-        <Emoji name={TEAM_EMOJI[r.id]} size={Math.round(size * 0.72)} className="drop-shadow-none" />
+        <Emoji name={emoji} size={Math.round(size * 0.72)} className="drop-shadow-none" />
       </span>
     )
   }
@@ -111,6 +112,7 @@ export function BallChip({ step, now, size = 'md', showTime = true }: { step: St
       initial={{ opacity: 0, x: -10, scale: 0.9 }}
       animate={{ opacity: 1, x: 0, scale: 1 }}
       transition={springs.bouncy}
+      title={shortName(step.holder)}
       className={cn('inline-flex max-w-full items-center gap-1.5 rounded-full border bg-surface pr-2 shadow-card', size === 'sm' ? 'py-0.5 pl-0.5 text-xs' : 'py-0.5 pl-0.5 text-[13px]', hot ? 'border-red/70' : 'border-line')}
     >
       <Avatar refObj={step.holder} size={size === 'sm' ? 18 : 22} />
@@ -128,7 +130,7 @@ export function shortName(r: Ref): string {
     const parts = n.split(' ')
     return parts.length > 1 ? `${parts[0]} ${parts[1][0]}.` : n
   }
-  return r.name
+  return refName(r)
 }
 
 /* ---------- Pills ---------- */
@@ -136,6 +138,7 @@ export function shortName(r: Ref): string {
 export function StatusPill({ status, className }: { status: HireStatus; className?: string }) {
   const tone: Record<HireStatus, string> = {
     ontrack: 'bg-green-soft text-green',
+    behind: 'bg-amber-soft text-amber-ink',
     ready: 'bg-green text-surface',
     atrisk: 'bg-red-soft text-red',
     unknown: 'border border-dashed border-muted text-muted',
@@ -162,9 +165,8 @@ export function Pill({ children, tone = 'neutral', className }: { children: Reac
 export function SourceBadge({ system, mode, className }: { system: SystemId; mode: Mode; className?: string }) {
   if (mode === 'native') return null
   const Icon = mode === 'connected' ? Plug : mode === 'linked' ? Link2 : Hand
-  const title = mode === 'connected' ? 'Connected: the system reports progress' : mode === 'linked' ? 'Linked: done there, confirmed by a person' : 'Manual: the owner marks it done'
   return (
-    <span title={title} className={cn('inline-flex shrink-0 items-center gap-1 rounded border border-line bg-surface px-1.5 py-px font-mono text-2xs text-muted', className)}>
+    <span title={MODE_LABEL[mode]} className={cn('inline-flex shrink-0 items-center gap-1 rounded border border-line bg-surface px-1.5 py-px font-mono text-2xs text-muted', className)}>
       <Icon className={cn('h-3 w-3', mode === 'connected' ? 'text-green' : mode === 'linked' ? 'text-accent' : 'text-faint')} />
       {systemNames[system]}
     </span>
@@ -189,7 +191,7 @@ export function ReadinessBar({ areas, mineArea, compact }: { areas: AreaView[]; 
         return (
           <div key={a.id} className="min-w-0" title={`${a.label}: ${a.done} of ${a.total} done`}>
             <div className={cn('h-1.5 rounded-full', fill)} />
-            {!compact && <div className="mt-1 truncate text-2xs text-muted">{a.label.split(' ')[0]}</div>}
+            {!compact && <div className="mt-1 truncate text-2xs text-muted">{a.short}</div>}
           </div>
         )
       })}
@@ -201,16 +203,12 @@ export function StageTrack({ stage, labels = false, width }: { stage: number; la
   return (
     <div style={width ? { width } : undefined}>
       <div className="grid grid-cols-7 gap-0.5">
-        {STAGE_SHORT.map((_, i) => (
-          <span key={i} className={cn('h-1.5 rounded-sm', i < stage ? 'bg-ink/80' : i === stage ? 'bg-accent' : 'bg-sunken')} />
+        {STAGES.map((l, i) => (
+          <span key={i} title={l} className={cn('h-1.5 rounded-sm', i < stage ? 'bg-ink/80' : i === stage ? 'bg-accent' : 'bg-sunken')} />
         ))}
       </div>
       {labels && (
-        <div className="mt-1 grid grid-cols-7 gap-0.5 font-mono text-[10px] text-faint">
-          {STAGE_SHORT.map((l, i) => (
-            <span key={l} className={cn('truncate', i === stage && 'text-accent')}>{l}</span>
-          ))}
-        </div>
+        <div className="mt-1 truncate text-[11px] text-muted"><span className="font-semibold text-accent">{STAGES[stage]}</span> · stage {stage + 1} of {STAGES.length}</div>
       )}
     </div>
   )

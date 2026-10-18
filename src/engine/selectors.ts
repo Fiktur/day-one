@@ -34,7 +34,7 @@ export const useFlash = (key: string) => useDemo((s) => key in s.flashes)
 
 /** Hires that haven't started yet, plus recent starters, in start-date order. */
 export function orderedHires(views: Record<string, HireView>): HireView[] {
-  const rank: Record<string, number> = { atrisk: 0, unknown: 1, ontrack: 2, ready: 3, started: 4, withdrawn: 5 }
+  const rank: Record<string, number> = { atrisk: 0, unknown: 1, behind: 2, ontrack: 3, ready: 4, started: 5, withdrawn: 6 }
   return Object.values(views).sort((a, b) => rank[a.status] - rank[b.status] || a.hire.start - b.hire.start || a.person.name.localeCompare(b.person.name))
 }
 

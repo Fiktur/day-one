@@ -5,13 +5,15 @@ import { simulate, type Forced, type HireState, type SimStep } from './simulate'
 
 export type StepState = 'blank' | 'open' | 'soon' | 'late' | 'confirming' | 'verified' | 'na' | 'unknown'
 export type AreaState = 'green' | 'progress' | 'red' | 'unknown' | 'blank' | 'mine'
-export type HireStatus = 'ontrack' | 'atrisk' | 'unknown' | 'ready' | 'withdrawn' | 'started'
+export type HireStatus = 'ontrack' | 'behind' | 'atrisk' | 'unknown' | 'ready' | 'withdrawn' | 'started'
 
 export interface Ref {
   kind: 'person' | 'team' | 'provider' | 'system'
   id: string
   name: string
   short: string
+  /** Vendors only: the team accountable for the vendor's work. */
+  steward?: TeamId
 }
 
 export interface StepView extends SimStep {
@@ -32,6 +34,7 @@ export interface StepView extends SimStep {
 export interface AreaView {
   id: Exclude<Area, 'ramp'>
   label: string
+  short: string
   state: AreaState
   done: number
   total: number
@@ -71,7 +74,11 @@ export function teamRef(id: TeamId): Ref {
 }
 export function providerRef(id: ProviderId): Ref {
   const p = providers[id]
-  return { kind: 'provider', id, name: p.name, short: p.short }
+  return { kind: 'provider', id, name: p.name, short: p.short, steward: SYSTEM_STEWARD[id === 'carrier' ? 'firstbase' : id] }
+}
+/** How a holder reads to people: a vendor shows under the team that answers for it ("IT · via Firstbase"). */
+export function refName(r: Ref): string {
+  return r.kind === 'provider' && r.steward ? `${teams[r.steward].short} · via ${r.name}` : r.name
 }
 const SYSTEM_PROVIDER: Partial<Record<SystemId, ProviderId>> = {
   greenhouse: 'greenhouse', workday: 'workday', checkr: 'checkr', firstbase: 'firstbase', google: 'google',
@@ -151,7 +158,7 @@ export function deriveHire(h: HireState, ctx: DeriveCtx): HireView {
       state = systemDown ? 'unknown' : 'confirming'
       const since = s.doneRecorded ?? s.done
       confirmSlow = bizBetween(since, now) > 2
-      label = systemDown ? "Can't check right now" : `Done ${rel(s.done, now)} · confirming`
+      label = systemDown ? "Can't check right now" : `Done ${rel(s.done, now)} · waiting to confirm`
     } else if (s.open != null && s.open <= now) {
       const due = s.due ?? s.open
       if (systemDown) {
@@ -162,7 +169,7 @@ export function deriveHire(h: HireState, ctx: DeriveCtx): HireView {
         label = `Delayed · expected ${fmtDay(s.eta)}`
       } else if (now > due) {
         state = 'late'
-        label = `Late by ${daysWord(bizBetween(due, now) || now - due)}`
+        label = `Overdue · ${daysWord(bizBetween(due, now) || now - due)}`
       } else {
         const left = bizBetween(now, due)
         const windowLen = bizBetween(s.open, due)
@@ -191,7 +198,8 @@ export function deriveHire(h: HireState, ctx: DeriveCtx): HireView {
           if (!x) continue
           const ok = (x.na && x.na.day <= now) || (x.ver != null && x.ver <= now)
           if (!ok) {
-            waitingOn = x.def.rename?.(h) ?? x.def.name
+            // Everyone reads this label, so a sensitive step only shows its safe wording.
+            waitingOn = x.def.safe?.done ?? x.def.rename?.(h) ?? x.def.name
             break
           }
         }
@@ -217,13 +225,15 @@ export function deriveHire(h: HireState, ctx: DeriveCtx): HireView {
 
   const areas: AreaView[] = AREAS.map((a) => {
     const list = steps.filter((s) => s.def.area === a.id && s.def.stage <= 4 && !s.def.cancel)
-    const done = list.filter((s) => s.state === 'verified' || s.state === 'na').length
+    // A withdrawn hire's steps are all "na"; counting them as done would paint every area green.
+    const done = list.filter((s) => s.state === 'verified' || (s.state === 'na' && !withdrawn)).length
     let state: AreaState = 'blank'
-    if (list.some((s) => s.red)) state = 'red'
+    if (withdrawn) state = 'blank'
+    else if (list.some((s) => s.red)) state = 'red'
     else if (list.some((s) => s.state === 'unknown')) state = 'unknown'
     else if (list.length && done === list.length) state = 'green'
     else if (list.some((s) => s.state !== 'blank')) state = 'progress'
-    return { id: a.id, label: a.label, state, done, total: list.length }
+    return { id: a.id, label: a.label, short: a.short, state, done, total: list.length }
   })
 
   // Forecast: when will the last critical pre-start step be confirmed?
@@ -238,7 +248,8 @@ export function deriveHire(h: HireState, ctx: DeriveCtx): HireView {
   const risk = preStart && !withdrawn && ((forecastEnd != null && forecastEnd >= h.start) || steps.some((s) => s.def.critical && s.red))
 
   const active = steps.filter((s) => s.holder && !(s.def.stage >= 5 && preStart))
-  const rank = (s: StepView) => (s.state === 'late' ? 0 : s.state === 'soon' ? 1 : s.red ? 2 : s.state === 'unknown' ? 3 : s.state === 'confirming' ? 6 : s.def.critical ? 4 : 5)
+  // A late step that blocks the start outranks a late one that doesn't.
+  const rank = (s: StepView) => (s.red && s.def.critical ? 0 : s.state === 'late' ? 1 : s.state === 'soon' ? 2 : s.red ? 3 : s.state === 'unknown' ? 4 : s.state === 'confirming' ? 7 : s.def.critical ? 5 : 6)
   const balls = [...active].sort((a, b) => rank(a) - rank(b) || (a.due ?? 999) - (b.due ?? 999))
 
   // A start date that arrives with critical work unfinished (e.g. no work permit) is not a start.
@@ -250,6 +261,7 @@ export function deriveHire(h: HireState, ctx: DeriveCtx): HireView {
   else if (!preStart) status = 'started'
   else if (risk) status = 'atrisk'
   else if (steps.some((s) => s.state === 'unknown')) status = 'unknown'
+  else if (steps.some((s) => s.def.stage <= 4 && (s.state === 'late' || (s.state === 'soon' && s.eta != null && s.eta > (s.due ?? s.eta))))) status = 'behind'
   else if (areas.every((a) => a.state === 'green')) status = 'ready'
   else status = 'ontrack'
 
@@ -260,6 +272,8 @@ export function deriveHire(h: HireState, ctx: DeriveCtx): HireView {
     const critical = pending.filter((s) => s.def.critical)
     const pool = critical.length ? critical : pending
     stage = pool.length ? Math.min(...pool.map((s) => s.def.stage)) : Math.max(1, ...steps.filter((s) => s.state === 'verified').map((s) => Math.min(4, s.def.stage)))
+    // A late side task (say, emergency contacts) must not pull the stage back behind critical work already done.
+    stage = Math.max(stage, ...steps.filter((s) => s.def.critical && s.def.stage <= 4 && s.state === 'verified').map((s) => s.def.stage))
   }
 
   const hireTasks = steps.filter((s) => s.def.owner.type === 'hire' && s.def.hire)
@@ -272,8 +286,9 @@ export function deriveHire(h: HireState, ctx: DeriveCtx): HireView {
 
 export const STATUS_LABEL: Record<HireStatus, string> = {
   ontrack: 'On track',
+  behind: 'Behind',
   atrisk: 'At risk',
-  unknown: "Can't check",
+  unknown: "Can't check right now",
   ready: 'Ready',
   withdrawn: 'Withdrawn',
   started: 'Started',
@@ -287,8 +302,12 @@ export function stepIsSensitiveFor(def: StepDef, viewer: { role: string; team?: 
   return true
 }
 
-export function safeName(s: StepView, viewer: { role: string; team?: TeamId }): string {
+const TO_DO: StepState[] = ['blank', 'open', 'soon', 'late', 'unknown']
+
+/** A step's name as this viewer may see it. `action` gives the to-do form while the step is still to be done. */
+export function safeName(s: StepView, viewer: { role: string; team?: TeamId }, opts?: { action?: boolean }): string {
   if (stepIsSensitiveFor(s.def, viewer) && s.def.safe) return s.state === 'verified' ? s.def.safe.done : s.def.safe.open
+  if (opts?.action && s.def.task && s.name === s.def.name && TO_DO.includes(s.state)) return s.def.task
   return s.name
 }
 

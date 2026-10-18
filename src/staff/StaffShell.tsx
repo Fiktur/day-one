@@ -6,6 +6,7 @@ import { useDemo } from '../engine/store'
 import { useViews } from '../engine/selectors'
 import { people, personRoleLabel, switcherGroups } from '../data/people'
 import { countMoves, queueFor } from '../engine/queues'
+import { safeName } from '../engine/derive'
 import { Avatar, Glyph, Kbd } from '../ui/parts'
 import { PageTransition, motion, springs, Num } from '../ui/motion'
 import { Emoji } from '../ui/assets'
@@ -42,7 +43,7 @@ export function navFor(viewer: string): Item[] {
       ]
     case 'recruiter':
       return [
-        { name: 'candidates', label: 'Candidates', icon: ClipboardList },
+        { name: 'candidates', label: 'Accepted offers', icon: ClipboardList },
         { name: 'startcheck', label: 'Start-date check', icon: CalendarCheck },
       ]
     case 'program':
@@ -160,7 +161,7 @@ function Notifications() {
           <button key={x.view.hire.id + x.step.key} type="button" onClick={() => go({ name: p.role === 'manager' ? 'hire' : 'hire', hireId: x.view.hire.id })} className="grid w-full grid-cols-[14px_1fr] gap-2 rounded-lg px-2 py-2 text-left hover:bg-sunken">
             <Glyph state={x.step.red ? 'late' : 'open'} className="mt-0.5" />
             <span className="min-w-0 text-[13px]">
-              <span className="font-medium">{x.step.name}</span> for {x.view.person.name}
+              <span className="font-medium">{safeName(x.step, { role: p.role, team: p.team }, { action: true })}</span> for {x.view.person.name}
               <span className={cn('block text-xs', x.step.red ? 'text-red' : 'text-muted')}>{x.step.label}</span>
             </span>
           </button>
@@ -212,7 +213,7 @@ export function StaffShell() {
         <div className="flex-1" />
         {!compact && (
           <button type="button" onClick={() => setPalette(true)} className="hidden h-8 w-56 items-center justify-between rounded-xl border border-line bg-surface/70 px-2.5 text-[13px] text-faint transition hover:border-accent/40 hover:shadow-glow lg:flex">
-            <span className="flex items-center gap-1.5"><Search className="h-3.5 w-3.5" />Search people and steps</span><Kbd>⌘K</Kbd>
+            <span className="flex items-center gap-1.5"><Search className="h-3.5 w-3.5" />Jump to a person or page</span><Kbd>⌘K</Kbd>
           </button>
         )}
         <motion.button type="button" aria-label="Ask Day One" onClick={() => setAssistant(true)} whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.9 }} transition={springs.bouncy} className="flex h-8 items-center gap-1.5 rounded-xl btn-gradient px-2.5 text-[12px] font-semibold text-white shadow-glow"><Bot className="h-4 w-4" />{!compact && 'Ask'}</motion.button>

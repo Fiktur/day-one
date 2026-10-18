@@ -81,9 +81,9 @@ function HireCard({ v }: { v: HireView }) {
       <ReadinessBar areas={v.areas} mineArea={myMoves.some((s) => s.def.area === 'prep') ? 'prep' : null} />
       {ball && ball.holder && (
         <div className="flex min-w-0 items-center gap-2 text-xs text-muted">
-          <span className="shrink-0">Ball</span>
+          <span className="shrink-0">Waiting on</span>
           <BallChip step={ball} now={now} size="sm" />
-          <span className="truncate">{safeName(ball, { role: person.role, team: person.team })}</span>
+          <span className="truncate">{safeName(ball, { role: person.role, team: person.team }, { action: true })}</span>
         </div>
       )}
       {myMoves.length > 0 && (
@@ -91,7 +91,7 @@ function HireCard({ v }: { v: HireView }) {
           {myMoves.slice(0, 2).map((s) => (
             <div key={s.key} className={cn('flex items-center gap-2 rounded-md px-2 py-1 text-xs', s.red ? 'bg-red-soft' : 'bg-amber-soft')}>
               <Glyph state={s.red ? 'late' : 'open'} size={10} />
-              <span className="flex-1 truncate font-medium">{s.name}</span>
+              <span className="flex-1 truncate font-medium">{safeName(s, { role: person.role, team: person.team }, { action: true })}</span>
               <span className={cn('shrink-0', s.red ? 'text-red' : 'text-amber-ink')}>{s.label.replace('Due ', '')}</span>
             </div>
           ))}

@@ -2,8 +2,9 @@ import { Hand, Link2, Plug } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import { useNav } from '../../nav/NavContext'
 import { useDemo } from '../../engine/store'
-import { STAGES, STEPS, SYSTEM_MODES, STEP_BY_KEY, systemNames, type StepDef } from '../../data/journey'
-import { teams, providers } from '../../data/people'
+import { MODE_LABEL, STAGES, STEPS, SYSTEM_MODES, STEP_BY_KEY, systemNames, type StepDef } from '../../data/journey'
+import { teams } from '../../data/people'
+import { providerRef, refName } from '../../engine/derive'
 import { Card, Pill, ReqTag } from '../../ui/parts'
 import { Page, PageHeader } from '../StaffShell'
 
@@ -13,7 +14,7 @@ function ownerText(d: StepDef): string {
   if (o.type === 'manager') return 'Hiring manager'
   if (o.type === 'recruiter') return 'Recruiter'
   if (o.type === 'team') return teams[o.team].name
-  return providers[o.id].name
+  return refName(providerRef(o.id))
 }
 
 function dueText(d: StepDef): string {
@@ -49,7 +50,7 @@ export function Journeys() {
                       {d.deps && d.deps.length > 0 && <div className="truncate text-xs text-muted">After: {d.deps.map((k) => STEP_BY_KEY[k]?.name).join(', ')}</div>}
                     </div>
                     <div className="text-muted">{ownerText(d)}</div>
-                    <div className="flex items-center gap-1.5 text-muted">{mode !== 'native' && <Icon className="h-3.5 w-3.5" />}{systemNames[d.system]}{mode !== 'native' ? ` · ${mode}` : ''}</div>
+                    <div className="flex items-center gap-1.5 text-muted">{mode !== 'native' && <Icon className="h-3.5 w-3.5" />}{systemNames[d.system]}{mode !== 'native' ? ` · ${MODE_LABEL[mode].toLowerCase()}` : ''}</div>
                     <div className="text-muted">{dueText(d)}{d.opens != null && d.opens !== 0 ? ` · opens ${Math.abs(d.opens)} days ${d.opens < 0 ? 'before' : 'after'} start` : ''}</div>
                   </div>
                 )

@@ -18,6 +18,7 @@ export function Insights() {
   const addSession = useDemo((s) => s.addSession)
   const atRisk = Object.values(views).filter((v) => v.status === 'atrisk').length
   const max = Math.max(...LEAD_TIMES.map((l) => l.p90))
+  const lateRates = SLA_BY_OWNER.map((o) => ({ ...o, rate: o.breaches / o.total })).sort((a, b) => b.rate - a.rate)
   const weeks = PLANNED_STARTS.map((w) => ({ ...w, seats: w.seats + (extra.includes(w.day) ? 12 : 0) }))
   const capMax = Math.max(...weeks.map((w) => Math.max(w.planned, w.seats)))
 
@@ -34,7 +35,7 @@ export function Insights() {
       <div className={cn('grid gap-4', compact ? 'grid-cols-1' : 'grid-cols-2')}>
         <Card className="p-4">
           <h2 className="font-semibold">Where the time goes</h2>
-          <p className="text-xs text-muted">Business days each step holds the ball. Bar is the median, the line marks the slowest 10%.</p>
+          <p className="text-xs text-muted">Business days each step waits on its owner. Bar is the median, the line marks the slowest 10%.</p>
           <div className="mt-4 space-y-3">
             {LEAD_TIMES.map((l, li) => (
               <div key={l.label} className="grid grid-cols-[150px_1fr_44px] items-center gap-3 text-[13px]">
@@ -76,12 +77,13 @@ export function Insights() {
         </Card>
         <Card className="p-4">
           <h2 className="font-semibold">Late steps by owner</h2>
+          <p className="text-xs text-muted">Share of each owner's steps that went past their due date. Owners with more steps aren't penalized for volume.</p>
           <div className="mt-3 space-y-2">
-            {SLA_BY_OWNER.map((o) => (
-              <div key={o.owner} className="grid grid-cols-[120px_1fr_70px] items-center gap-3 text-[13px]">
-                <span>{o.owner}</span>
-                <span className="h-2 rounded-full bg-sunken"><motion.span className={cn('block h-full rounded-full', o.breaches >= 3 ? 'bg-red/80' : 'bg-amber')} initial={{ width: 0 }} animate={{ width: `${(o.breaches / 5) * 100}%` }} transition={{ ...springs.soft, delay: 0.2 }} /></span>
-                <span className="text-right font-mono text-xs text-muted tnum">{o.breaches} of {o.total}</span>
+            {lateRates.map((o) => (
+              <div key={o.owner} className="grid grid-cols-[150px_1fr_92px] items-center gap-3 text-[13px]">
+                <span className="truncate" title={o.owner}>{o.owner}</span>
+                <span className="h-2 rounded-full bg-sunken"><motion.span className={cn('block h-full rounded-full', o.rate >= 0.04 ? 'bg-red/80' : 'bg-amber')} initial={{ width: 0 }} animate={{ width: `${(o.rate / lateRates[0].rate) * 100}%` }} transition={{ ...springs.soft, delay: 0.2 }} /></span>
+                <span className="text-right font-mono text-xs text-muted tnum" title={`${o.breaches} of ${o.total} steps`}>{(o.rate * 100).toFixed(1)}% · {o.breaches}/{o.total}</span>
               </div>
             ))}
           </div>

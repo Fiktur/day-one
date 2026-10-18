@@ -6,7 +6,7 @@ import { HIRES } from '../data/hires'
 import { addBiz, fmtDay, fmtLong, fmtShort, fmtWeekdayShort, nextWeekday, rel } from '../lib/dates'
 import { useDemo } from '../engine/store'
 import { selectViews, ctxOf } from '../engine/selectors'
-import { managerFor, type HireView } from '../engine/derive'
+import { STATUS_LABEL, managerFor, refName, safeName, type HireView } from '../engine/derive'
 import { queueFor } from '../engine/queues'
 import { messagesFor } from '../engine/messages'
 import { checkDates, hypothetical } from '../engine/startcheck'
@@ -158,7 +158,7 @@ function hireReply(viewer: string, q: string): AssistantReply {
   }
   if (/person|human|talk|someone/.test(t)) {
     s.addRequest(h.id, q, 'maria')
-    return { text: "I've passed this to Maria Hill in People Experience, with our conversation so far. She'll reply here, usually the same day.", steps: [{ label: 'Request created for People Experience', ok: true }] }
+    return { text: "I've passed this to Maria Hill on the onboarding team, with our conversation so far. She'll reply here, usually the same day.", steps: [{ label: 'Request created for the onboarding team', ok: true }] }
   }
   return fallback()
 }
@@ -198,10 +198,10 @@ function managerReply(viewer: string, q: string): AssistantReply {
     if (!v) return fallback()
     const p = v.primary
     return {
-      text: `${first(v.hire.id)} is ${v.status === 'atrisk' ? 'at risk' : v.status === 'ontrack' ? 'on track' : v.status === 'ready' ? 'ready' : v.status} for ${fmtDay(v.hire.start)}.`,
+      text: v.status === 'unknown' ? `${first(v.hire.id)}'s status for ${fmtDay(v.hire.start)} is unclear: a system can't be checked right now.` : `${first(v.hire.id)} is ${lc(STATUS_LABEL[v.status])} for ${fmtDay(v.hire.start)}.`,
       bullets: [
         ...v.areas.map((a) => `${a.label}: ${a.state === 'green' ? 'done' : a.state === 'red' ? 'needs attention' : a.state === 'unknown' ? "can't check right now" : `${a.done} of ${a.total} done`}`),
-        ...(p ? [`Right now: ${p.holder?.name} has the ball (${p.name.toLowerCase()}, ${lc(p.label)})`] : []),
+        ...(p?.holder ? [`Right now: waiting on ${refName(p.holder)} (${lc(safeName(p, { role: 'manager' }))}, ${lc(p.label)})`] : []),
       ],
       sources: ['Day One · readiness'],
       note: 'You see summaries for screening and immigration, not details.',
@@ -238,7 +238,7 @@ function programReply(viewer: string, q: string): AssistantReply {
     return {
       text: `${first(v.hire.id)} is at risk because ${p.name.toLowerCase()} is ${lc(p.label)}.`,
       bullets: [
-        `${p.holder?.name ?? 'The owner'} has the ball${p.heldSince != null ? ` and has had it since ${fmtDay(p.heldSince)}` : ''}.`,
+        `Waiting on ${p.holder ? refName(p.holder) : 'the owner'}${p.heldSince != null ? ` since ${fmtDay(p.heldSince)}` : ''}.`,
         v.forecastEnd != null ? `Forecast: the last critical step finishes ${fmtDay(v.forecastEnd)}, ${v.forecastEnd >= v.hire.start ? 'after' : 'before'} the start date (${fmtDay(v.hire.start)}).` : 'The forecast is waiting on a decision.',
         ...(v.hire.id === 'hal' ? ['Options: an in-stock model ships in 1–2 days; local pickup in San Diego; or move the start a week.'] : []),
       ],
@@ -248,7 +248,7 @@ function programReply(viewer: string, q: string): AssistantReply {
     }
   }
   if (/risk|trouble|problem|attention/.test(t)) {
-    const list = Object.values(views).filter((v) => v.status === 'atrisk' || v.status === 'unknown')
+    const list = Object.values(views).filter((v) => v.status === 'atrisk' || v.status === 'behind' || v.status === 'unknown')
     return {
       text: list.length ? `${list.length} hire${list.length > 1 ? 's need' : ' needs'} attention.` : 'Nobody is at risk right now.',
       bullets: list.map((v) => `${v.person.name} (${fmtShort(v.hire.start)}): ${(v.balls.find((b) => b.red) ?? v.primary)?.name.toLowerCase() ?? 'status unknown'}, ${(v.balls.find((b) => b.red) ?? v.primary)?.label.toLowerCase() ?? ''}`),
@@ -289,13 +289,13 @@ function recruiterReply(viewer: string, q: string): AssistantReply {
   }
   if (/next two weeks|who starts|starting/.test(t)) {
     const list = Object.values(views).filter((v) => v.hire.start >= s.now && v.hire.start <= s.now + 21 && v.status !== 'withdrawn')
-    return { text: `${list.length} people start in the next three weeks.`, bullets: list.map((v) => `${v.person.name} · ${fmtShort(v.hire.start)} · ${v.status === 'atrisk' ? 'at risk' : 'on track'}`), sources: ['Candidates'] }
+    return { text: `${list.length} people start in the next three weeks.`, bullets: list.map((v) => `${v.person.name} · ${fmtShort(v.hire.start)} · ${lc(STATUS_LABEL[v.status])}`), sources: ['Candidates'] }
   }
   const v = findHire(q, 'wanda')!
   return {
-    text: `${v.person.name} is in ${['the offer stage', 'set-up', 'clearances', 'equipment and access', 'the final week', 'day one', 'her first 90 days'][v.stage]}.`,
+    text: `${v.person.name} is in ${['the offer stage', 'set-up', 'clearances', 'equipment and access', 'the final week', 'day one', 'the first 90 days'][v.stage]}.`,
     bullets: [
-      v.primary ? `${v.primary.holder?.name} has the ball: ${v.primary.def.sensitive ? (v.primary.def.safe?.open ?? 'in progress') : v.primary.name.toLowerCase()}, ${lc(v.primary.label)}` : 'Nobody is holding anything right now',
+      v.primary?.holder ? `Waiting on ${refName(v.primary.holder)}: ${lc(safeName(v.primary, { role: 'recruiter' }))}, ${lc(v.primary.label)}` : 'Nothing is waiting on anyone right now',
       v.dateMoved ? `Start date moved to ${fmtDay(v.hire.start)} (was ${fmtDay(v.hire.originalStart)})` : `Starts ${fmtDay(v.hire.start)}`,
     ],
     sources: ['Candidates'],
@@ -330,7 +330,7 @@ function headReply(viewer: string, q: string): AssistantReply {
   const s = S()
   const t = q.toLowerCase()
   if (/time|lose|slow|where/.test(t)) {
-    return { text: 'The biggest waits in the last 90 days:', bullets: LEAD_TIMES.slice(0, 4).map((l) => `${l.label}: median ${l.median} business days (${l.owner})`), sources: ['Insights · lead times'], note: 'Workday confirmations are the easiest win: People Systems checks three task types by hand.' }
+    return { text: 'The biggest waits in the last 90 days:', bullets: LEAD_TIMES.slice(0, 4).map((l) => `${l.label}: median ${l.median} business days (${l.owner})`), sources: ['Insights · lead times'], note: 'Workday confirmations are the easiest win: HR Operations checks three task types by hand.' }
   }
   if (/risk/.test(t)) return programReply(viewer, q)
   const over = PLANNED_STARTS.map((w) => ({ ...w, seats: w.seats + (s.extraSessions.includes(w.day) ? 12 : 0) })).filter((w) => w.planned > w.seats)

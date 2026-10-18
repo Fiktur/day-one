@@ -35,9 +35,9 @@ export function handledFor(v: HireView, now: number, laptopModel?: string): Hand
   const permitNeeded = permit && permit.state !== 'na' && (permit.state !== 'blank' || v.hire.mobilityNote.startsWith('Needed'))
   if (permit && permitNeeded) {
     let glyph: GlyphState = 'prog'
-    let text = 'In progress with Atlas Immigration'
+    let text = 'In progress with Atlas Legal'
     if (permit.state === 'verified') { glyph = 'verified'; text = 'Approved' }
-    else if (permit.eta != null) text = `In progress · expected ${fmtDay(permit.eta)}`
+    else if (permit.eta != null) text = `${permit.eta >= v.hire.start ? 'Taking longer than usual' : 'In progress'} · expected ${fmtDay(permit.eta)}`
     out.push({ key: 'permit', label: 'Work permit', glyph, text, flashKeys: ['permit'] })
   }
 
@@ -60,7 +60,7 @@ export function handledFor(v: HireView, now: number, laptopModel?: string): Hand
       const waitingOnPermit = permit && permit.state !== 'verified' && permit.state !== 'na'
       text = `Ordered · set-up starts once your ${waitingOnPermit ? 'work permit' : 'work account'} is ready`
     }
-    else if (rel_.state !== 'blank') { glyph = 'prog'; text = 'Ordering now' }
+    else if (rel_.state !== 'blank') { glyph = 'prog'; text = v.hire.rehire ? 'Reissuing your returned laptop now' : 'Ordering now' }
     out.push({ key: 'laptop', label: laptopModel ? `Laptop · ${laptopModel}` : 'Laptop', glyph, text, flashKeys: ['laptop_release', 'laptop_prep', 'laptop_ship', 'laptop_deliver'] })
   }
 
@@ -92,7 +92,7 @@ export function hireTaskLabel(s: StepView, v: HireView, now: number): string {
       return `Overdue since ${fmtDay(s.due!)}`
     case 'confirming':
       if (s.def.confirm === 'manager') return `Waiting for ${people[v.hire.managerId]?.name.split(' ')[0]} to confirm`
-      return `You marked this done · ${systemNames[s.def.system]} is confirming`
+      return `You marked this done · waiting for ${systemNames[s.def.system]} to confirm`
     case 'verified':
       return `Done ${fmtShort(s.ver!)}`
     case 'unknown':

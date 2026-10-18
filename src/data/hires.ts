@@ -65,13 +65,14 @@ export const HIRES: HireBase[] = [
       consent: { doneAt: 1 },
       wd_deposit: { doneAt: 8 },
       wd_id: { doneAt: 3 },
+      wd_contacts: { never: true },
       buddy: { doneAt: 3 },
       board_invite: { doneAt: 8 },
       hello: { doneAt: 9 },
     },
   },
   {
-    id: 'wanda', title: 'Product Designer', dept: 'Design', managerId: 'diana', recruiterId: 'kate',
+    id: 'wanda', title: 'Product Designer', dept: 'Design', managerId: 'diana', recruiterId: 'kate', buddyId: 'kitty',
     location: 'Lisbon office', mode: 'office', country: 'PT', tz: 'Lisbon time', offer: 1, start: 35, needsWorkAuth: true,
     milestone: 'First design shipped to customers', boardTemplate: 'default',
     laptop: { model: 'MacBook Pro 14"', address: 'Northbeam Lisbon, Av. da Liberdade 110' },
@@ -84,7 +85,7 @@ export const HIRES: HireBase[] = [
     },
   },
   {
-    id: 'matt', title: 'Legal Counsel', dept: 'Legal', managerId: 'franklin', recruiterId: 'kate',
+    id: 'matt', title: 'Legal Counsel', dept: 'Legal', managerId: 'franklin', recruiterId: 'kate', buddyId: 'foggy',
     location: 'New York office', mode: 'office', country: 'US', tz: 'Eastern time', offer: 4, start: 28,
     milestone: 'First contract review, supervised', boardTemplate: 'default',
     laptop: { model: 'MacBook Air 15"', address: 'Northbeam New York, 85 Broad St' },
@@ -100,7 +101,7 @@ export const HIRES: HireBase[] = [
     overrides: { consent: { doneAt: 14 } },
   },
   {
-    id: 'wade', title: 'Account Executive', dept: 'Sales, West', managerId: 'logan', recruiterId: 'kate',
+    id: 'wade', title: 'Account Executive', dept: 'Sales, West', managerId: 'logan', recruiterId: 'kate', buddyId: 'oliver',
     location: 'Remote, Denver', mode: 'remote', country: 'US', tz: 'Mountain time', offer: 7, start: 35,
     milestone: 'First customer call, supervised', boardTemplate: 'default',
     laptop: { model: 'MacBook Air 15"', address: '9 Larimer Sq, Denver, CO' },
@@ -139,7 +140,7 @@ export const HIRES: HireBase[] = [
     overrides: { wd_deposit: { doneAt: 8 }, board_invite: { doneAt: 7 }, hello: { doneAt: 9 } },
   },
   {
-    id: 'dinah', title: 'Customer Success Manager', dept: 'Sales, West', managerId: 'logan', recruiterId: 'kate',
+    id: 'dinah', title: 'Customer Success Manager', dept: 'Sales, West', managerId: 'logan', recruiterId: 'kate', buddyId: 'oliver',
     location: 'Remote, Seattle', mode: 'remote', country: 'US', tz: 'Pacific time', offer: 7, start: 35,
     milestone: 'First customer check-in, supervised', boardTemplate: 'default',
     laptop: { model: 'MacBook Air 15"', address: '1201 Pike St, Seattle, WA' },

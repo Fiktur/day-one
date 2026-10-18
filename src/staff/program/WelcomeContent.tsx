@@ -85,7 +85,7 @@ export function WelcomeContent() {
           <Card className="space-y-2 p-4">
             <h3 className="font-semibold">Benefits and policies</h3>
             {['Benefits guide 2026', 'Employee handbook', 'How we work at Northbeam', 'Security basics'].map((x) => (
-              <div key={x} className="flex items-center justify-between rounded-lg bg-bg px-3 py-2 text-[13px]"><span className="flex items-center gap-2"><Link2 className="h-3.5 w-3.5 text-accent" />{x}</span><span className="text-xs text-muted">Owner: People Experience · review in Jan</span></div>
+              <div key={x} className="flex items-center justify-between rounded-lg bg-bg px-3 py-2 text-[13px]"><span className="flex items-center gap-2"><Link2 className="h-3.5 w-3.5 text-accent" />{x}</span><span className="text-xs text-muted">Owner: Onboarding team · review in Jan</span></div>
             ))}
           </Card>
         </div>

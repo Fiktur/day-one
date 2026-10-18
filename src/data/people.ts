@@ -43,19 +43,22 @@ add({ id: 'lucius', name: 'Lucius Fox', title: 'Senior Director, Hardware', role
 // People team, specialists, IT, workplace
 add({ id: 'kate', name: 'Kate Bishop', title: 'Recruiter', role: 'recruiter', team: 'recruiting', hue: 2 })
 add({ id: 'maria', name: 'Maria Hill', title: 'Onboarding Program Manager', role: 'program', team: 'program', hue: 0 })
-add({ id: 'alfred', name: 'Alfred Pennyworth', title: 'People Experience Coordinator', role: 'program', team: 'program', hue: 3 })
-add({ id: 'monica', name: 'Monica Rambeau', title: 'Global Mobility Partner', role: 'team', team: 'mobility', hue: 1 })
-add({ id: 'barbara', name: 'Barbara Gordon', title: 'People Systems Lead', role: 'team', team: 'hris', hue: 2 })
-add({ id: 'jennifer', name: 'Jennifer Walters', title: 'Employment Compliance Lead', role: 'team', team: 'screening', hue: 3 })
+add({ id: 'alfred', name: 'Alfred Pennyworth', title: 'Onboarding Coordinator', role: 'program', team: 'program', hue: 3 })
+add({ id: 'monica', name: 'Monica Rambeau', title: 'Immigration Partner', role: 'team', team: 'mobility', hue: 1 })
+add({ id: 'barbara', name: 'Barbara Gordon', title: 'HR Operations Lead', role: 'team', team: 'hris', hue: 2 })
+add({ id: 'jennifer', name: 'Jennifer Walters', title: 'Background Screening Lead', role: 'team', team: 'screening', hue: 3 })
 add({ id: 'shuri', name: 'Shuri', title: 'IT Lead', role: 'team', team: 'it', hue: 0 })
 add({ id: 'felicity', name: 'Felicity Smoak', title: 'IT Service Desk', role: 'team', team: 'it', hue: 1 })
-add({ id: 'luke', name: 'Luke Cage', title: 'Workplace Manager', role: 'team', team: 'workplace', hue: 2 })
+add({ id: 'luke', name: 'Luke Cage', title: 'Facilities Manager', role: 'team', team: 'workplace', hue: 2 })
 add({ id: 'pepper', name: 'Pepper Potts', title: 'Head of People', role: 'head', hue: 1 })
 
 // Teammates and buddies
 add({ id: 'jaime', name: 'Jaime Reyes', title: 'Network Engineer · buddy', role: 'manager', hue: 2 })
 add({ id: 'ryan', name: 'Ryan Choi', title: 'Senior Network Engineer', role: 'manager', hue: 3 })
 add({ id: 'miles', name: 'Miles Morales', title: 'Software Engineer, Platform', role: 'manager', hue: 1 })
+add({ id: 'kitty', name: 'Kitty Pryde', title: 'Senior Product Designer', role: 'manager', hue: 0 })
+add({ id: 'foggy', name: 'Foggy Nelson', title: 'Senior Counsel', role: 'manager', hue: 2 })
+add({ id: 'oliver', name: 'Oliver Queen', title: 'Senior Account Executive', role: 'manager', hue: 3 })
 
 export interface Team {
   id: TeamId
@@ -65,12 +68,12 @@ export interface Team {
 }
 
 export const teams: Record<TeamId, Team> = {
-  it: { id: 'it', name: 'IT and equipment', short: 'IT', members: ['shuri', 'felicity'] },
-  hris: { id: 'hris', name: 'People Systems', short: 'People Systems', members: ['barbara'] },
-  screening: { id: 'screening', name: 'Screening and compliance', short: 'Screening', members: ['jennifer'] },
-  mobility: { id: 'mobility', name: 'Global mobility', short: 'Global mobility', members: ['monica'] },
-  workplace: { id: 'workplace', name: 'Workplace', short: 'Workplace', members: ['luke'] },
-  program: { id: 'program', name: 'People Experience', short: 'People Experience', members: ['maria', 'alfred'] },
+  it: { id: 'it', name: 'IT', short: 'IT', members: ['shuri', 'felicity'] },
+  hris: { id: 'hris', name: 'HR Operations', short: 'HR Ops', members: ['barbara'] },
+  screening: { id: 'screening', name: 'Background screening', short: 'Screening', members: ['jennifer'] },
+  mobility: { id: 'mobility', name: 'Immigration and visas', short: 'Immigration', members: ['monica'] },
+  workplace: { id: 'workplace', name: 'Facilities', short: 'Facilities', members: ['luke'] },
+  program: { id: 'program', name: 'Onboarding team', short: 'Onboarding', members: ['maria', 'alfred'] },
   recruiting: { id: 'recruiting', name: 'Recruiting', short: 'Recruiting', members: ['kate'] },
 }
 
@@ -83,13 +86,13 @@ export interface Provider {
 export const providers: Record<ProviderId, Provider> = {
   checkr: { id: 'checkr', name: 'Checkr', short: 'CK' },
   firstbase: { id: 'firstbase', name: 'Firstbase', short: 'FB' },
-  carrier: { id: 'carrier', name: 'Carrier', short: 'UP' },
-  immigration: { id: 'immigration', name: 'Atlas Immigration', short: 'AI' },
+  carrier: { id: 'carrier', name: 'UPS', short: 'UPS' },
+  immigration: { id: 'immigration', name: 'Atlas Legal', short: 'AL' },
   workday: { id: 'workday', name: 'Workday', short: 'WD' },
   google: { id: 'google', name: 'Google Workspace', short: 'GW' },
   greenhouse: { id: 'greenhouse', name: 'Greenhouse', short: 'GH' },
   calendar: { id: 'calendar', name: 'Calendar', short: 'CA' },
-  benefits: { id: 'benefits', name: 'Benefits site', short: 'BN' },
+  benefits: { id: 'benefits', name: 'Benefits portal', short: 'BN' },
 }
 
 /** People the presenter can "become" from the role switcher, grouped by role. */
@@ -97,7 +100,7 @@ export const switcherGroups: { label: string; ids: string[] }[] = [
   { label: 'New hires', ids: ['virgil', 'hal', 'wanda', 'peter', 'kamala'] },
   { label: 'Managers', ids: ['tony', 'carol', 'diana', 'lucius', 'bruce'] },
   { label: 'Recruiting', ids: ['kate'] },
-  { label: 'People Experience', ids: ['maria'] },
+  { label: 'Onboarding team', ids: ['maria'] },
   { label: 'Specialist teams', ids: ['shuri', 'felicity', 'barbara', 'jennifer', 'monica', 'luke'] },
   { label: 'Leadership', ids: ['pepper'] },
 ]
@@ -106,7 +109,7 @@ export const roleLabel: Record<Role, string> = {
   hire: 'New hire',
   manager: 'Hiring manager',
   recruiter: 'Recruiter',
-  program: 'Program manager',
+  program: 'Onboarding team',
   team: 'Team',
   head: 'Head of People',
 }

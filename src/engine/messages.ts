@@ -28,6 +28,8 @@ export function messagesFor(v: HireView, ctx: DeriveCtx, edits: Record<string, {
   const first = v.person.name.split(' ')[0]
   const mgr = managerFor(h, ctx).id
   const mgrFirst = people[mgr]?.name.split(' ')[0] ?? 'Your manager'
+  const buddyPicked = v.by.buddy?.ver != null && v.by.buddy.ver <= now && !!h.buddyId
+  const buddyFirst = buddyPicked ? people[h.buddyId!]?.name.split(' ')[0] ?? null : null
   const out: MsgInstance[] = []
 
   for (const t of MSG_TEMPLATES) {
@@ -54,6 +56,9 @@ export function messagesFor(v: HireView, ctx: DeriveCtx, edits: Record<string, {
     else if (day <= now) status = 'sent'
     else status = 'scheduled'
 
+    // A buddy message can only go out once a buddy has really been picked.
+    if (t.from === 'buddy' && !buddyPicked && status !== 'stopped') { expected = day; day = null; status = 'waiting' }
+
     if (t.id === 'digest' && day != null && day <= now) {
       const due = v.hireTasks.filter((s) => s.due != null && s.due >= day! && s.due <= day! + 7 && !(s.ver != null && s.ver <= day!))
       if (!due.length && status !== 'stopped') status = 'skipped'
@@ -63,7 +68,7 @@ export function messagesFor(v: HireView, ctx: DeriveCtx, edits: Record<string, {
     let fromId: string | null = null
     let from = FROM_LABEL[t.from]
     if (t.from === 'manager') { fromId = mgr; from = people[mgr]?.name ?? from }
-    if (t.from === 'buddy' && h.buddyId) { fromId = h.buddyId; from = people[h.buddyId]?.name ?? from }
+    if (t.from === 'buddy' && buddyPicked) { fromId = h.buddyId!; from = people[fromId]?.name ?? from }
     if (t.from === 'company') fromId = 'pepper'
     if (t.from === 'program') fromId = 'maria'
 
@@ -79,8 +84,8 @@ export function messagesFor(v: HireView, ctx: DeriveCtx, edits: Record<string, {
       from,
       fromId,
       channel: day != null && day >= h.start ? 'Work email' : 'Personal email',
-      subject: t.subject(first, mgrFirst),
-      body: edited?.text ?? t.body(first, mgrFirst),
+      subject: t.subject(first, mgrFirst, buddyFirst),
+      body: edited?.text ?? t.body(first, mgrFirst, buddyFirst),
       edited,
       editableUntil: t.editableByManager != null ? prevWeekday(h.start + t.editableByManager) : null,
     })

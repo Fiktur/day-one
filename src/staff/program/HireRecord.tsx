@@ -6,10 +6,10 @@ import { cn, lc } from '../../lib/cn'
 import { useNav, isCoordinator } from '../../nav/NavContext'
 import { useDemo } from '../../engine/store'
 import { useView, ctxOf, useCtx } from '../../engine/selectors'
-import { safeName, stepIsSensitiveFor, type HireView, type StepView } from '../../engine/derive'
+import { refName, safeName, stepIsSensitiveFor, type HireView, type StepView } from '../../engine/derive'
 import { messagesFor } from '../../engine/messages'
-import { STAGES, STEPS, systemNames } from '../../data/journey'
-import { people } from '../../data/people'
+import { MODE_LABEL, STAGES, STEPS, systemNames } from '../../data/journey'
+import { people, type TeamId } from '../../data/people'
 import { fmtDay, fmtShort } from '../../lib/dates'
 import { Avatar, BallChip, Button, Card, Glyph, Pill, ReqTag, StageTrack, StatusPill } from '../../ui/parts'
 import { StepRow } from '../../ui/StepRow'
@@ -93,7 +93,7 @@ export function HireRecord() {
             </div>
             <div className="p-3">
               {tab === 'readiness' && <ReadinessTab v={v} />}
-              {tab === 'evidence' && selected && <Evidence v={v} s={selected} hidden={stepIsSensitiveFor(selected.def, viewerCtx)} name={safeName(selected, viewerCtx)} />}
+              {tab === 'evidence' && selected && <Evidence v={v} s={selected} viewer={viewerCtx} />}
               {tab === 'messages' && <MessagesTab v={v} />}
               {tab === 'activity' && <ActivityTab v={v} />}
             </div>
@@ -108,7 +108,7 @@ export function HireRecord() {
 function BallBanner({ v }: { v: HireView }) {
   const now = useDemo((s) => s.now)
   const s = useDemo()
-  const { viewer } = useNav()
+  const { viewer, person } = useNav()
   const red = v.balls.find((b) => b.red)
   const p = red ?? v.primary
   if (v.status === 'withdrawn') {
@@ -117,16 +117,16 @@ function BallBanner({ v }: { v: HireView }) {
   if (!p) return null
   const hal = v.hire.id === 'hal' && v.by.laptop_prep?.eta != null && v.by.laptop_prep.state !== 'verified'
   const fixes = hal ? [
-    { l: 'Switch to an in-stock model', run: () => { s.speedUp('hal', 'laptop_prep', 1); s.set({ laptopModel: { ...s.laptopModel, hal: 'MacBook Pro 14" (in stock)' } }); toast.success('Firstbase confirmed an in-stock MacBook Pro 14"', { description: 'Hal is back on track. He’ll see the new model on his home.' }) } },
+    { l: 'Switch to an in-stock model', run: () => { s.speedUp('hal', 'laptop_prep', 1); s.set({ laptopModel: { ...s.laptopModel, hal: 'MacBook Pro 14" (in stock)' } }); toast.success('Firstbase confirmed an in-stock MacBook Pro 14"', { description: 'Hal is back on track and will see the new model on the Day One home.' }) } },
     { l: 'Local pickup in San Diego', run: () => { s.speedUp('hal', 'laptop_prep', 1); s.speedUp('hal', 'laptop_deliver', 0); s.set({ laptopModel: { ...s.laptopModel, hal: 'San Diego office stock' } }); toast.success('Pickup booked for Hal at the San Diego office', { description: 'IT reserved a laptop from office stock.' }) } },
     { l: 'Move start to Nov 9', run: () => s.setDialog({ type: 'changeDate', hireId: 'hal', to: v.hire.start + 7 }) },
   ] : []
   const forecast = v.forecastEnd != null ? `Forecast: everything ready by ${fmtDay(v.forecastEnd)}, ${v.forecastEnd >= v.hire.start ? `${v.forecastEnd - v.hire.start + 1} day${v.forecastEnd - v.hire.start ? 's' : ''} after the start date` : `${v.hire.start - v.forecastEnd} days before the start`}.` : 'Forecast is waiting on a decision.'
   return (
-    <div className={cn('mb-4 rounded-xl border px-4 py-3', red ? 'border-red/40 bg-red-soft' : 'border-line bg-surface')}>
+    <div className={cn('mb-4 rounded-xl border px-4 py-3', red ? (v.risk ? 'border-red/40 bg-red-soft' : 'border-amber/40 bg-amber-soft') : 'border-line bg-surface')}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        {red ? <TriangleAlert className="h-4 w-4 text-red" /> : <Glyph state="prog" />}
-        <span className="text-[13px]"><span className="font-semibold">{p.holder?.name} {p.heldSince != null && p.heldSince < now ? `has had the ball for ${now - p.heldSince} day${now - p.heldSince > 1 ? 's' : ''}` : 'has the ball'}.</span> {p.name}: {p.ownerAway ? 'owner is out of office, ' : ''}{lc(p.label)}.</span>
+        {red ? <TriangleAlert className={cn('h-4 w-4', v.risk ? 'text-red' : 'text-amber-ink')} /> : <Glyph state="prog" />}
+        <span className="text-[13px]"><span className="font-semibold">Waiting on {p.holder ? refName(p.holder) : 'the owner'}{p.heldSince != null && p.heldSince < now ? ` for ${now - p.heldSince} day${now - p.heldSince > 1 ? 's' : ''}` : ''}.</span> {safeName(p, { role: person.role, team: person.team }, { action: true })}: {p.ownerAway ? 'owner is out of office, ' : ''}{lc(p.label)}.</span>
         {p.holder && <BallChip step={p} now={now} />}
       </div>
       <div className={cn('mt-1 text-xs', v.risk ? 'font-medium text-red' : 'text-muted')}>{forecast} <ReqTag ids="X2 O7" /></div>
@@ -145,17 +145,19 @@ function BallBanner({ v }: { v: HireView }) {
   )
 }
 
-function Evidence({ v, s, hidden, name }: { v: HireView; s: StepView; hidden: boolean; name: string }) {
-  const unlocks = STEPS.filter((d) => d.deps?.includes(s.key)).map((d) => v.by[d.key]?.name ?? d.name)
-  const deps = (s.def.deps ?? []).map((d) => v.by[d]).filter(Boolean)
+function Evidence({ v, s, viewer }: { v: HireView; s: StepView; viewer: { role: string; team?: TeamId } }) {
+  const hidden = stepIsSensitiveFor(s.def, viewer)
+  const name = safeName(s, viewer)
+  const unlocks = STEPS.filter((d) => d.deps?.includes(s.key)).map((d) => v.by[d.key]).filter(Boolean).map((d) => safeName(d!, viewer))
+  const deps = (s.def.deps ?? []).map((d) => v.by[d]).filter(Boolean).map((d) => safeName(d!, viewer))
   const rows: [string, string][] = [
-    ['Owner', s.owner.name],
-    ['Source', s.mode === 'native' ? 'Day One' : `${systemNames[s.def.system]} · ${s.mode}`],
+    ['Owner', refName(s.owner)],
+    ['Source', s.mode === 'native' ? 'Day One' : `${systemNames[s.def.system]} · ${MODE_LABEL[s.mode].toLowerCase()}`],
     ['Opened', s.open != null && s.state !== 'blank' ? fmtDay(s.open) : '—'],
     ['Due', s.due != null && s.state !== 'blank' ? fmtDay(s.due) : '—'],
     ['Happened', s.done != null && s.state !== 'blank' && s.state !== 'open' && s.state !== 'soon' && s.state !== 'late' ? fmtDay(s.done) : '—'],
     ['Recorded', s.doneRecorded != null && s.state !== 'blank' && s.state !== 'open' && s.state !== 'soon' && s.state !== 'late' ? fmtDay(s.doneRecorded) : '—'],
-    ['Confirmed by', s.state === 'verified' ? `${s.verBy ?? s.confirmer?.name ?? s.owner.name} · ${fmtDay(s.ver!)}` : s.state === 'confirming' ? `Waiting on ${s.confirmer?.name}` : '—'],
+    ['Confirmed by', s.state === 'verified' ? `${(s.verBy && people[s.verBy]?.name) ?? s.verBy ?? s.confirmer?.name ?? s.owner.name} · ${fmtDay(s.ver!)}` : s.state === 'confirming' ? `Waiting on ${s.confirmer?.name}` : '—'],
   ]
   return (
     <div className="space-y-3">
@@ -167,14 +169,14 @@ function Evidence({ v, s, hidden, name }: { v: HireView; s: StepView; hidden: bo
         </div>
       </div>
       {hidden ? (
-        <p className="rounded-lg bg-sunken px-3 py-2 text-xs text-muted">Details for this step are limited to {s.def.sensitive === 'screening' ? 'Screening' : 'Global mobility'}. You see the status and dates.</p>
+        <p className="rounded-lg bg-sunken px-3 py-2 text-xs text-muted">Details for this step are limited to {s.def.sensitive === 'screening' ? 'Background screening' : 'Immigration and visas'}. You see the status and dates.</p>
       ) : null}
       <dl className="grid grid-cols-[96px_1fr] gap-x-3 gap-y-1.5 text-[13px]">
         {rows.map(([k, val]) => (
           <div key={k} className="contents"><dt className="text-muted">{k}</dt><dd className="tnum">{val}</dd></div>
         ))}
         {s.eta != null && <div className="contents"><dt className="text-muted">Provider ETA</dt><dd className="font-medium text-red">{fmtDay(s.eta)}</dd></div>}
-        {deps.length > 0 && <div className="contents"><dt className="text-muted">Waits on</dt><dd>{deps.map((d) => d!.name).join(', ')}</dd></div>}
+        {deps.length > 0 && <div className="contents"><dt className="text-muted">Waits on</dt><dd>{deps.join(', ')}</dd></div>}
         {unlocks.length > 0 && <div className="contents"><dt className="text-muted">Unlocks</dt><dd>{unlocks.join(', ')}</dd></div>}
         {s.na && <div className="contents"><dt className="text-muted">Decision</dt><dd>{s.na.reason}</dd></div>}
         {s.key === 'mobility_review' && <div className="contents"><dt className="text-muted">Decision</dt><dd>{v.hire.mobilityNote}</dd></div>}

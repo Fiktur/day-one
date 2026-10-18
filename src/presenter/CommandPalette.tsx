@@ -91,7 +91,7 @@ export function CommandPalette() {
                 <Command.Item value="split view" onSelect={() => { set({ split: true }); close() }} className={item}>Split view: three people side by side</Command.Item>
                 <Command.Item value="under the hood event log" onSelect={() => { set({ underHood: true }); close() }} className={item}>Under the hood: event log</Command.Item>
                 <Command.Item value="requirement tags" onSelect={() => { set({ tags: !useDemo.getState().tags }); close() }} className={item}>Toggle requirement tags</Command.Item>
-                <Command.Item value="manual first setup" onSelect={() => { useDemo.getState().setSetup(useDemo.getState().setup === 'manual' ? 'connected' : 'manual'); close() }} className={item}>Switch connected / manual-first setup</Command.Item>
+                <Command.Item value="automatic manual updates setup" onSelect={() => { useDemo.getState().setSetup(useDemo.getState().setup === 'manual' ? 'connected' : 'manual'); close() }} className={item}>Switch automatic / manual updates</Command.Item>
                 <Command.Item value="reset demo" onSelect={() => { useDemo.getState().reset(); clearChats(); close() }} className={item}>Reset the demo</Command.Item>
               </Command.Group>
             </Command.List>

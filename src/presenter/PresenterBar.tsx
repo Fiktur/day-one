@@ -95,7 +95,7 @@ export function PresenterBar() {
 
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="hidden min-[1100px]:block"><Segmented size="xs" value={s.split ? 'split' : 'single'} options={[['split', 'Split'], ['single', 'Single']] as const} onChange={(v) => s.setSplit(v === 'split')} /></span>
-        <Segmented size="xs" value={s.setup} options={[['connected', 'Connected'], ['manual', 'Manual-first']] as const} onChange={(v) => s.setSetup(v)} />
+        <Segmented size="xs" value={s.setup} options={[['connected', 'Automatic'], ['manual', 'Manual updates']] as const} onChange={(v) => s.setSetup(v)} />
         <span className="hidden sm:contents">
           <IconBtn on={s.underHood} label="Under the hood: live event log  (U)" onClick={() => s.set({ underHood: !s.underHood })}><Terminal className="h-4 w-4" /></IconBtn>
           <IconBtn on={s.tags} label="Requirement tags from the brief  (T)" onClick={() => s.set({ tags: !s.tags })}><Tag className="h-4 w-4" /></IconBtn>

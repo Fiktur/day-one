@@ -34,6 +34,18 @@ export function StartCheck() {
   }, [mode, hireId, loc, auth, views, ctx, extra])
 
   const earliest = results.find((r) => r.verdict === 'safe')
+  // Dates that can't work collapse into one line; listing each one says the same thing several times.
+  const firstOk = results.findIndex((r) => r.verdict !== 'no')
+  const noRun = firstOk === -1 ? results : results.slice(0, firstOk)
+  const folded = noRun.length > 1 ? noRun : []
+  const row = (r: DateCheck) => (
+    <div key={r.day} className={cn('grid grid-cols-[16px_110px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-3 py-2.5', r.verdict === 'safe' && r === earliest && 'bg-green-soft/60')}>
+      <Glyph state={r.verdict === 'safe' ? 'verified' : r.verdict === 'risk' ? 'open' : 'late'} />
+      <span className="font-medium tnum">{fmtDay(r.day)}</span>
+      <span className="text-xs text-muted">{r.reason}</span>
+      <Pill tone={VERDICT[r.verdict].tone}>{VERDICT[r.verdict].label}</Pill>
+    </div>
+  )
   return (
     <Page>
       <PageHeader title="Start-date check" sub="Pick a date and see whether onboarding can meet it, using real lead times from recent hires." tags={<ReqTag ids="X2" />} />
@@ -65,14 +77,17 @@ export function StartCheck() {
           <div className="px-3 pb-2 pt-2 text-[13px]">
             {earliest ? <>Earliest safe start: <span className="font-semibold">{fmtDay(earliest.day)}</span></> : 'No safe date in the next few weeks.'}
           </div>
-          {results.map((r) => (
-            <div key={r.day} className={cn('grid grid-cols-[16px_110px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-3 py-2.5', r.verdict === 'safe' && r === earliest && 'bg-green-soft/60')}>
-              <Glyph state={r.verdict === 'safe' ? 'verified' : r.verdict === 'risk' ? 'open' : 'late'} />
-              <span className="font-medium tnum">{fmtDay(r.day)}</span>
-              <span className="text-xs text-muted">{r.reason}</span>
-              <Pill tone={VERDICT[r.verdict].tone}>{VERDICT[r.verdict].label}</Pill>
-            </div>
-          ))}
+          {folded.length > 0 && (
+            <details className="group rounded-lg">
+              <summary className="grid cursor-pointer list-none grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-sunken">
+                <Glyph state="late" />
+                <span className="text-[13px]"><span className="font-medium">{firstOk === -1 ? `None of the next ${folded.length} dates work` : `Not before ${fmtDay(results[firstOk].day)}`}</span> <span className="text-xs text-muted">· {folded[folded.length - 1].reason}</span></span>
+                <span className="text-xs text-accent group-open:hidden">Show {folded.length} dates</span>
+              </summary>
+              {folded.map(row)}
+            </details>
+          )}
+          {results.filter((r) => !folded.includes(r)).map(row)}
           <p className="px-3 pb-2 pt-3 text-[11px] text-faint">Lead times come from when steps actually happened for the last 62 hires, including dates people entered by hand.</p>
         </Card>
       </div>
