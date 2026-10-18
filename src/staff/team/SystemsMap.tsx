@@ -18,7 +18,7 @@ export const NODE_META: Record<MapNode, { emoji: EmojiName; role: string; name: 
   greenhouse: { emoji: E.greenhouse, role: 'Offers in', name: 'Greenhouse' },
   workday: { emoji: E.workday, role: 'HR record and tasks', name: 'Workday' },
   checkr: { emoji: E.checkr, role: 'Background checks', name: 'Checkr' },
-  immigration: { emoji: E.immigration, role: 'Work permits', name: 'Atlas Immigration', short: 'Atlas' },
+  immigration: { emoji: E.immigration, role: 'Work permits', name: 'Atlas Legal', short: 'Atlas' },
   firstbase: { emoji: E.firstbase, role: 'Laptops', name: 'Firstbase' },
   google: { emoji: E.google, role: 'Work accounts', name: 'Google Workspace', short: 'Google' },
   calendar: { emoji: E.calendar, role: 'Invites', name: 'Calendar' },

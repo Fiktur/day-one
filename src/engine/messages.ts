@@ -28,7 +28,8 @@ export function messagesFor(v: HireView, ctx: DeriveCtx, edits: Record<string, {
   const first = v.person.name.split(' ')[0]
   const mgr = managerFor(h, ctx).id
   const mgrFirst = people[mgr]?.name.split(' ')[0] ?? 'Your manager'
-  const buddyFirst = h.buddyId && v.by.buddy?.ver != null && v.by.buddy.ver <= now ? people[h.buddyId]?.name.split(' ')[0] ?? null : null
+  const buddyPicked = v.by.buddy?.ver != null && v.by.buddy.ver <= now && !!h.buddyId
+  const buddyFirst = buddyPicked ? people[h.buddyId!]?.name.split(' ')[0] ?? null : null
   const out: MsgInstance[] = []
 
   for (const t of MSG_TEMPLATES) {
@@ -56,7 +57,6 @@ export function messagesFor(v: HireView, ctx: DeriveCtx, edits: Record<string, {
     else status = 'scheduled'
 
     // A buddy message can only go out once a buddy has really been picked.
-    const buddyPicked = v.by.buddy?.ver != null && v.by.buddy.ver <= now && !!h.buddyId
     if (t.from === 'buddy' && !buddyPicked && status !== 'stopped') { expected = day; day = null; status = 'waiting' }
 
     if (t.id === 'digest' && day != null && day <= now) {
@@ -68,7 +68,7 @@ export function messagesFor(v: HireView, ctx: DeriveCtx, edits: Record<string, {
     let fromId: string | null = null
     let from = FROM_LABEL[t.from]
     if (t.from === 'manager') { fromId = mgr; from = people[mgr]?.name ?? from }
-    if (t.from === 'buddy' && h.buddyId) { fromId = h.buddyId; from = people[h.buddyId]?.name ?? from }
+    if (t.from === 'buddy' && buddyPicked) { fromId = h.buddyId!; from = people[fromId]?.name ?? from }
     if (t.from === 'company') fromId = 'pepper'
     if (t.from === 'program') fromId = 'maria'
 

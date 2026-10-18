@@ -261,7 +261,7 @@ export function deriveHire(h: HireState, ctx: DeriveCtx): HireView {
   else if (!preStart) status = 'started'
   else if (risk) status = 'atrisk'
   else if (steps.some((s) => s.state === 'unknown')) status = 'unknown'
-  else if (steps.some((s) => s.red && s.def.stage <= 4)) status = 'behind'
+  else if (steps.some((s) => s.def.stage <= 4 && (s.state === 'late' || (s.state === 'soon' && s.eta != null && s.eta > (s.due ?? s.eta))))) status = 'behind'
   else if (areas.every((a) => a.state === 'green')) status = 'ready'
   else status = 'ontrack'
 
@@ -272,6 +272,8 @@ export function deriveHire(h: HireState, ctx: DeriveCtx): HireView {
     const critical = pending.filter((s) => s.def.critical)
     const pool = critical.length ? critical : pending
     stage = pool.length ? Math.min(...pool.map((s) => s.def.stage)) : Math.max(1, ...steps.filter((s) => s.state === 'verified').map((s) => Math.min(4, s.def.stage)))
+    // A late side task (say, emergency contacts) must not pull the stage back behind critical work already done.
+    stage = Math.max(stage, ...steps.filter((s) => s.def.critical && s.def.stage <= 4 && s.state === 'verified').map((s) => s.def.stage))
   }
 
   const hireTasks = steps.filter((s) => s.def.owner.type === 'hire' && s.def.hire)

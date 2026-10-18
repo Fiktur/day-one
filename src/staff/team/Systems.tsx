@@ -136,7 +136,7 @@ function MapTab({ sel, setSel }: { sel: MapNode; setSel: (n: MapNode) => void })
   const stats = [
     { label: 'Events today', value: s.log.filter((l) => l.day === s.now).length, emoji: 'bell' as const },
     { label: 'Automatic connections', value: live, suffix: ` of ${SYSTEMS.length}`, emoji: 'plug' as const },
-    { label: 'Waiting on a system', value: steps.filter((x) => x.state === 'confirming').length, emoji: 'hourglass' as const },
+    { label: 'Waiting to confirm', value: steps.filter((x) => x.state === 'confirming').length, emoji: 'hourglass' as const },
     { label: "Can't check right now", value: steps.filter((x) => x.state === 'unknown').length, emoji: 'warning' as const, tone: 'red' as const },
   ]
   return (

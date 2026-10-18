@@ -10,7 +10,7 @@ import type { Mode, SystemId } from '../data/journey'
 import { MODE_LABEL, systemNames } from '../data/journey'
 import type { AreaView, HireStatus, Ref, StepState, StepView } from '../engine/derive'
 import { STATUS_LABEL, refName } from '../engine/derive'
-import { STAGES, STAGE_SHORT } from '../data/journey'
+import { STAGES } from '../data/journey'
 import { REQS } from '../data/reqs'
 import { useDemo } from '../engine/store'
 import { heldFor } from '../lib/dates'
@@ -112,6 +112,7 @@ export function BallChip({ step, now, size = 'md', showTime = true }: { step: St
       initial={{ opacity: 0, x: -10, scale: 0.9 }}
       animate={{ opacity: 1, x: 0, scale: 1 }}
       transition={springs.bouncy}
+      title={shortName(step.holder)}
       className={cn('inline-flex max-w-full items-center gap-1.5 rounded-full border bg-surface pr-2 shadow-card', size === 'sm' ? 'py-0.5 pl-0.5 text-xs' : 'py-0.5 pl-0.5 text-[13px]', hot ? 'border-red/70' : 'border-line')}
     >
       <Avatar refObj={step.holder} size={size === 'sm' ? 18 : 22} />
@@ -202,16 +203,12 @@ export function StageTrack({ stage, labels = false, width }: { stage: number; la
   return (
     <div style={width ? { width } : undefined}>
       <div className="grid grid-cols-7 gap-0.5">
-        {STAGE_SHORT.map((_, i) => (
-          <span key={i} className={cn('h-1.5 rounded-sm', i < stage ? 'bg-ink/80' : i === stage ? 'bg-accent' : 'bg-sunken')} />
+        {STAGES.map((l, i) => (
+          <span key={i} title={l} className={cn('h-1.5 rounded-sm', i < stage ? 'bg-ink/80' : i === stage ? 'bg-accent' : 'bg-sunken')} />
         ))}
       </div>
       {labels && (
-        <div className="mt-1 grid grid-cols-7 gap-0.5 font-mono text-[10px] text-faint">
-          {STAGE_SHORT.map((l, i) => (
-            <span key={l} title={STAGES[i]} className={cn('truncate', i === stage && 'text-accent')}>{l}</span>
-          ))}
-        </div>
+        <div className="mt-1 truncate text-[11px] text-muted"><span className="font-semibold text-accent">{STAGES[stage]}</span> · stage {stage + 1} of {STAGES.length}</div>
       )}
     </div>
   )

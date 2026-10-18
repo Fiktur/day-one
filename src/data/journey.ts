@@ -53,7 +53,6 @@ export interface StepDef {
 }
 
 export const STAGES = ['Offer', 'Set-up', 'Clearances', 'Equipment and access', 'Final week', 'Day one', 'First 90 days']
-export const STAGE_SHORT = ['Offer', 'Set-up', 'Clearances', 'Equipment', 'Final week', 'Day one', 'First 90 days']
 
 export const AREAS: { id: Exclude<Area, 'ramp'>; label: string; short: string }[] = [
   { id: 'employment', label: 'Cleared to start', short: 'Cleared' },
@@ -80,7 +79,7 @@ export const STEPS: StepDef[] = [
     safe: { open: 'Background check being set up', done: 'Background check started' } },
   { key: 'consent', name: 'Background check consent', task: 'Give background check consent', stage: 1, area: 'employment', owner: { type: 'hire' }, system: 'checkr', deps: ['bg_order'], due: { sla: 3 }, confirm: 'system', typ: 1, lag: 0, sensitive: 'screening',
     hire: { label: 'Give consent for your background check', help: 'Opens Checkr in a new tab. Your answers stay with Checkr.', minutes: 10, cta: 'Open Checkr' },
-    safe: { open: 'Waiting on the hire to give consent', done: 'Consent given' } },
+    safe: { open: 'Background check consent', done: 'Consent given' } },
   { key: 'mobility_review', name: 'Work authorization review', task: 'Review work authorization', stage: 1, area: 'employment', owner: { type: 'team', team: 'mobility' }, system: 'dayone', deps: ['offer'], due: { sla: 2 }, confirm: 'owner', typ: 1, sensitive: 'immigration',
     safe: { open: 'Work authorization review', done: 'Work authorization reviewed' } },
   { key: 'cohort_seat', name: 'Orientation seat held', task: 'Hold an orientation seat', stage: 1, area: 'arrival', owner: { type: 'team', team: 'program' }, system: 'dayone', deps: ['offer'], due: { sla: 1 }, confirm: 'instant', typ: 0, reqs: ['O10'] },
@@ -153,7 +152,7 @@ export const systemNames: Record<SystemId, string> = {
   google: 'Google Workspace',
   dayone: 'Day One',
   benefits: 'Benefits portal',
-  immigration: 'Atlas Immigration',
+  immigration: 'Atlas Legal',
   calendar: 'Calendar',
   badge: 'Badge system',
 }

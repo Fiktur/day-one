@@ -83,7 +83,7 @@ export function HireHome() {
                   <span className="text-[15px] font-semibold text-white/90">day{days === 1 ? '' : 's'} to go</span>
                 </div>
               )}
-              <div className="mt-1 text-[13px] font-medium text-white/85">{blocked ? `Not ${fmtWeekdayShort(h.start)}. ${people[h.managerId]?.name.split(' ')[0]} will be in touch.` : fmtWeekdayShort(h.start)}</div>
+              <div className="mt-1 text-[13px] font-medium text-white/85">{blocked ? `Not ${fmtWeekdayShort(h.start)}. ${people.maria.name.split(' ')[0]} will be in touch.` : fmtWeekdayShort(h.start)}</div>
               {mayMove && <div className="mt-1 text-[12px] text-white/85">Your start date may move. {people.maria.name.split(' ')[0]} will confirm it with you by {fmtShort(addBiz(now, 2))}.</div>}
             </div>
             <Ring pct={pct} label={<><Num value={doneCount} />/{own.length}</>} aria={`${doneCount} of ${own.length} of your tasks done`} />
@@ -92,7 +92,7 @@ export function HireHome() {
             <span className="grid h-5 w-5 place-items-center rounded-full bg-white">
               <Glyph state={anyRed ? 'late' : 'verified'} size={14} />
             </span>
-            <span className="min-w-0 truncate font-medium">{anyRed ? 'One thing needs you today' : mayMove ? 'Nothing you need to do right now' : actionable.length ? (companySlow ? "You're on track. One thing is with us." : "You're on track. Nothing late.") : "You're all set for now"}</span>
+            <span className="min-w-0 truncate font-medium">{anyRed ? 'One thing needs you today' : blocked ? 'We’ll confirm your new date with you' : mayMove ? (actionable.length ? 'Keep going. We’ll confirm your date.' : 'Nothing you need to do right now') : actionable.length ? (companySlow ? "You're on track. One thing is with us." : "You're on track. Nothing late.") : "You're all set for now"}</span>
           </div>
           {!blocked && <Emoji name="rocket" size={46} float className="absolute bottom-12 right-[92px] opacity-95" />}
         </motion.div>

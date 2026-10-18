@@ -87,7 +87,7 @@ export const providers: Record<ProviderId, Provider> = {
   checkr: { id: 'checkr', name: 'Checkr', short: 'CK' },
   firstbase: { id: 'firstbase', name: 'Firstbase', short: 'FB' },
   carrier: { id: 'carrier', name: 'UPS', short: 'UPS' },
-  immigration: { id: 'immigration', name: 'Atlas Immigration', short: 'AI' },
+  immigration: { id: 'immigration', name: 'Atlas Legal', short: 'AL' },
   workday: { id: 'workday', name: 'Workday', short: 'WD' },
   google: { id: 'google', name: 'Google Workspace', short: 'GW' },
   greenhouse: { id: 'greenhouse', name: 'Greenhouse', short: 'GH' },

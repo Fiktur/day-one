@@ -38,7 +38,7 @@ export const SUGGESTIONS: { title: string; detail: string; impact: string }[] = 
   {
     title: 'Ask managers for the buddy at offer, not two weeks before',
     detail: 'Buddy selection is the most common late manager step (9 of the last 62 hires).',
-    impact: 'Removes the most frequent reason a hire is "at risk" in week two.',
+    impact: 'Removes the most frequent reason a hire falls behind in week two.',
   },
   {
     title: 'Add an orientation session the week of Nov 16',

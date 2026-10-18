@@ -37,8 +37,8 @@ export function Candidates() {
       <div className={cn('grid gap-4', compact ? 'grid-cols-1' : 'grid-cols-[minmax(0,1.7fr)_minmax(280px,1fr)]')}>
         <Card className="overflow-hidden">
           {!compact && (
-            <div className="grid grid-cols-[minmax(0,1.4fr)_90px_100px_minmax(0,1.3fr)_110px] gap-3 border-b border-line bg-bg px-4 py-2 font-mono text-[10px] uppercase tracking-wider text-faint">
-              <span>Hire</span><span>Starts</span><span>Where</span><span>Waiting on</span><span>Flag</span>
+            <div className="grid grid-cols-[minmax(0,1.1fr)_64px_96px_minmax(0,1.6fr)_76px] gap-3 border-b border-line bg-bg px-4 py-2 font-mono text-[10px] uppercase tracking-wider text-faint">
+              <span>Hire</span><span>Starts</span><span>Stage</span><span>Waiting on</span><span>Status</span>
             </div>
           )}
           {shown.map((v) => <Row key={v.hire.id} v={v} selected={sel === v.hire.id} onSelect={() => setSel(v.hire.id)} compact={compact} />)}
@@ -63,10 +63,10 @@ function Row({ v, selected, onSelect, compact }: { v: HireView; selected: boolea
     )
   }
   return (
-    <button type="button" onClick={onSelect} className={cn('grid w-full grid-cols-[minmax(0,1.4fr)_90px_100px_minmax(0,1.3fr)_110px] items-center gap-3 border-b border-line px-4 py-2.5 text-left last:border-0 hover:bg-bg', selected && 'bg-accent-soft hover:bg-accent-soft', flash && 'animate-flash')}>
+    <button type="button" onClick={onSelect} className={cn('grid w-full grid-cols-[minmax(0,1.1fr)_64px_96px_minmax(0,1.6fr)_76px] items-center gap-3 border-b border-line px-4 py-2.5 text-left last:border-0 hover:bg-bg', selected && 'bg-accent-soft hover:bg-accent-soft', flash && 'animate-flash')}>
       <span className="flex min-w-0 items-center gap-2"><Avatar id={v.hire.id} size={26} /><span className="min-w-0"><span className="block truncate text-[13px] font-medium">{v.person.name}</span><span className="block truncate text-xs text-muted">{v.hire.title}</span></span></span>
       <span className="text-[13px] tnum">{v.status === 'withdrawn' ? '—' : fmtShort(v.hire.start)}{v.dateMoved && <span className="block text-[11px] text-muted">was {fmtShort(v.hire.originalStart)}</span>}</span>
-      <StageTrack stage={v.stage} width={90} />
+      <StageTrack stage={v.stage} width={88} />
       <span className="min-w-0">{v.primary ? <BallChip step={v.primary} now={now} size="sm" /> : <span className="text-xs text-faint">—</span>}</span>
       <span>{flag}</span>
     </button>
@@ -90,7 +90,7 @@ function Drawer({ v }: { v: HireView }) {
       <div>
         <div className="text-xs text-muted">Stage</div>
         <div className="font-medium">{STAGES[v.stage]}</div>
-        <div className="mt-1.5"><StageTrack stage={v.stage} labels /></div>
+        <div className="mt-1.5"><StageTrack stage={v.stage} /></div>
       </div>
       <div className="space-y-1.5">
         <div className="text-xs text-muted">Happening now</div>

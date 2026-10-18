@@ -35,7 +35,7 @@ const check = (ok, msg) => { if (!ok) failures.push(msg); console.log(`${ok ? 'o
     const bad = (m) => out.problems.push(m)
     for (const v of Object.values(views)) {
       const n = v.person.name
-      if (v.status === 'ontrack' && v.steps.some((s) => s.red && s.def.stage <= 4)) bad(`${n} is "On track" with a late step`)
+      if (v.status === 'ontrack' && v.steps.some((s) => s.state === 'late' && s.def.stage <= 4)) bad(`${n} is "On track" with a late step`)
       for (const s of v.steps) {
         if (s.def.sensitive && s.def.safe) {
           const shown = der.safeName(s, { role: 'manager' }, { action: true })
@@ -45,13 +45,25 @@ const check = (ok, msg) => { if (!ok) failures.push(msg); console.log(`${ok ? 'o
       }
       for (const m of msg.messagesFor(v, ctx, {})) {
         const picked = v.by.buddy?.ver != null && v.by.buddy.ver <= ctx.now
-        if (m.template.from === 'buddy' && !picked && (m.status === 'sent' || m.status === 'scheduled')) bad(`${n}: buddy message ${m.status} before a buddy was picked`)
+        if (m.template.from === 'buddy' && !picked && (m.status === 'sent' || m.status === 'scheduled' || m.fromId)) bad(`${n}: buddy message ${m.status} from ${m.from} before a buddy was picked`)
         if (m.template.id === 'manager_welcome') {
           const named = Object.values(people).find((p) => m.body.includes(`${p.name.split(' ')[0]} will be your buddy`))
           if (named && (!picked || named.id !== v.hire.buddyId)) bad(`${n}: manager note names ${named.name} as buddy`)
         }
       }
     }
+    // Across the weeks before the starts: "Behind" only with something overdue, and the stage never slides back.
+    const last = {}
+    for (let day = 10; day <= 27; day++) {
+      st.setNow(day)
+      for (const v of Object.values(sel.selectViews(window.__demo.getState()))) {
+        if (v.status === 'withdrawn' || day >= v.hire.start) continue
+        if (v.status === 'behind' && !v.steps.some((s) => s.state === 'late' || /^Delayed/.test(s.label))) bad(`${v.person.name} is "Behind" on day ${day} with nothing overdue`)
+        if (last[v.hire.id] != null && v.stage < last[v.hire.id]) bad(`${v.person.name}'s stage goes back on day ${day}`)
+        last[v.hire.id] = v.stage
+      }
+    }
+    st.setNow(10)
     out.hal = { status: views.hal.status, contacts: views.hal.by.wd_contacts.label }
     out.ted = views.ted.status
     out.via = der.refName(der.providerRef('firstbase'))
@@ -66,7 +78,7 @@ const check = (ok, msg) => { if (!ok) failures.push(msg); console.log(`${ok ? 'o
   const screens = [
     ['maria', { name: 'command' }], ['maria', { name: 'hire', hireId: 'hal' }], ['maria', { name: 'insights' }],
     ['tony', { name: 'myhires' }], ['tony', { name: 'hire', hireId: 'barry' }], ['kate', { name: 'candidates' }],
-    ['shuri', { name: 'queue' }], ['shuri', { name: 'hires' }], ['shuri', { name: 'systems' }], ['wanda', { name: 'home' }],
+    ['shuri', { name: 'queue' }], ['shuri', { name: 'hires' }], ['monica', { name: 'hires' }], ['shuri', { name: 'systems' }], ['wanda', { name: 'home' }],
   ]
   const texts = {}
   for (const [viewer, route] of screens) {
@@ -78,6 +90,7 @@ const check = (ok, msg) => { if (!ok) failures.push(msg); console.log(`${ok ? 'o
   check(/waiting on/i.test(texts['maria:command']), 'command center says "Waiting on"')
   check(/Hal Jordan/.test(texts['maria:command']) && /Behind/.test(texts['maria:command']), 'command center opens on problems and shows Hal as Behind')
   check(/Hello done/.test(texts['tony:hire:barry']), 'board card falls back to step states (Barry)')
+  check(/Wanda Maximoff/.test(texts['monica:hires']), "Immigration's Hires tab shows Wanda, whose permit is with their vendor")
   check(/Accepted offers/.test(texts['kate:candidates']), 'recruiter nav and title say "Accepted offers"')
   check(/Your start date may move/.test(texts['wanda:home']), 'Wanda sees that her start date may move')
   check(await page.locator('[aria-label$="of your tasks done"]').count() === 1, 'progress ring says "of your tasks"')
