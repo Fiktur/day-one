@@ -104,13 +104,15 @@ export function defaultFirstWeek(h: HireView['hire'], mgrFirst: string, buddyFir
 export function usePlan(v: HireView) {
   const ctx = useCtx()
   const saved = useDemo((s) => s.plans[v.hire.id])
-  const work = useDemo((s) => s.firstWork[v.hire.id])
+  const stored = useDemo((s) => s.firstWork[v.hire.id])
+  // A step done before the demo started has no saved text, so fall back to wording built from the hire's milestone.
+  const work = stored ?? (v.by.first_work?.state === 'verified' ? { title: `A starter task toward your ${v.hire.milestone.charAt(0).toLowerCase() + v.hire.milestone.slice(1)}`, link: '' } : undefined)
   const h = v.hire
   const session = SESSIONS.find((x) => x.day === h.start && x.group === groupFor(h))
   const buddy = buddyOf(v)
   const firstName = (id: string) => people[id]?.name.split(' ')[0] ?? id
   const plan = saved ?? defaultFirstWeek(h, firstName(managerFor(h, ctx).id), buddy ? firstName(buddy) : null, session?.where ?? null, work?.title ?? null)
-  return { plan, work, session, saved: !!saved }
+  return { plan, work, session, saved: !!saved || v.by.first_week?.state === 'verified' }
 }
 
 /** How a hire's own task reads to them. */

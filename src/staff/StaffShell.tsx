@@ -1,13 +1,13 @@
 import { useId, useState, type ReactNode } from 'react'
 import { Bell, Bot, ChevronDown, LayoutDashboard, Search, Users, Mail, CalendarRange, Heart, GitBranch, LineChart, ListTodo, Server, CalendarCheck, UserCog, ClipboardList } from 'lucide-react'
-import { cn } from '../lib/cn'
+import { cn, lc } from '../lib/cn'
 import { useNav } from '../nav/NavContext'
 import { useDemo } from '../engine/store'
 import { ctxOf, useViews } from '../engine/selectors'
 import { people, personRoleLabel, switcherGroups, teams } from '../data/people'
 import { countMoves, queueFor } from '../engine/queues'
 import { managerFor, safeName } from '../engine/derive'
-import { FixButton } from './program/fixes'
+import { FixButton, fixFor } from './program/fixes'
 import { prepActionFor } from './manager/PrepActions'
 import { StepActions } from '../ui/StepRow'
 import { systemNames } from '../data/journey'
@@ -155,7 +155,7 @@ function Notifications() {
     ...(p.role === 'manager' ? Object.values(views).filter((v) => managerFor(v.hire, ctx).id === viewer || v.hire.managerId === viewer).flatMap((v) =>
       v.status === 'withdrawn' ? [{ key: `w:${v.hire.id}`, hireId: v.hire.id, text: `${v.person.name} withdrew. Nothing needed from you.` }]
         : v.status === 'atrisk' && v.primary?.holder && !(v.primary.holder.kind === 'person' && v.primary.holder.id === viewer) ? [{ key: `r:${v.hire.id}`, hireId: v.hire.id, text: `${v.person.name}'s start date is at risk. Maria Hill is on it.` }] : []) : []),
-    ...q.vendor.filter((x) => !x.step.red).slice(0, 3).map((x) => ({ key: `v:${x.view.hire.id}:${x.step.key}`, hireId: x.view.hire.id, text: `${x.step.holder?.name} has ${x.view.person.name.split(' ')[0]}'s ${safeName(x.step, { role: p.role, team: p.team }).toLowerCase()} · ${x.step.label.toLowerCase()}` })),
+    ...q.vendor.filter((x) => !x.step.red).slice(0, 3).map((x) => ({ key: `v:${x.view.hire.id}:${x.step.key}`, hireId: x.view.hire.id, text: `${x.view.person.name.split(' ')[0]} · ${safeName(x.step, { role: p.role, team: p.team })}: with ${x.step.holder?.name}, ${lc(x.step.label)}` })),
   ]
   const groups = Array.from(new Set(todo.map((x) => x.view.hire.id))).map((id) => ({ v: views[id], items: todo.filter((x) => x.view.hire.id === id) }))
   const red = todo.filter((x) => x.step.red).length
@@ -174,11 +174,17 @@ function Notifications() {
         <div className="border-b border-line px-3 py-2 text-[13px] font-semibold">{overseer && q.move.length === 0 ? 'Needs attention across all hires' : 'To do'} <span className="font-normal text-muted">· {todo.length}</span></div>
         <div className="p-1">
           {todo.length === 0 && <div className="px-3 py-4 text-center text-[13px] text-muted"><Emoji name="party" size={30} float className="mx-auto mb-1" />Nothing waiting on you.</div>}
-          {groups.map(({ v, items }) => (
+          {groups.map(({ v, items }) => {
+            // Several steps stuck for one reason get one button, on the first of them.
+            const seen = new Set<string>()
+            return (
             <div key={v.hire.id} className="rounded-lg px-2 py-1.5">
               <button type="button" onClick={() => go({ name: 'hire', hireId: v.hire.id })} className="flex items-center gap-1.5 text-xs font-semibold hover:text-accent"><Avatar id={v.hire.id} size={18} />{v.person.name}</button>
               {items.map(({ step }) => {
                 const by = nudgedBy(v.hire.id, step.key)
+                const fix = fixFor(v, step, st, viewer)
+                const dup = !!fix && seen.has(fix.label)
+                if (fix) seen.add(fix.label)
                 return (
                   <div key={step.key} className="mt-1 flex items-center gap-2 pl-6">
                     <Glyph state={step.red ? 'late' : 'open'} size={10} />
@@ -186,12 +192,13 @@ function Notifications() {
                       <span className="block truncate font-medium">{safeName(step, { role: p.role, team: p.team }, { action: true })}</span>
                       <span className={cn('block truncate text-xs', step.red ? 'text-red' : 'text-muted')}>{by ? `Nudged by ${people[by]?.name.split(' ')[0]} · ` : ''}{step.label}</span>
                     </span>
-                    {overseer || step.holder?.kind === 'provider' ? <FixButton v={v} s={step} /> : (prepActionFor(v, step) ?? <StepActions view={v} step={step} compact />)}
+                    {overseer || step.holder?.kind === 'provider' ? (!dup && <FixButton v={v} s={step} />) : (prepActionFor(v, step) ?? <StepActions view={v} step={step} compact />)}
                   </div>
                 )
               })}
             </div>
-          ))}
+            )
+          })}
         </div>
         {fyi.length > 0 && (
           <>

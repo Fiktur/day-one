@@ -6,7 +6,7 @@ import { useNav } from '../nav/NavContext'
 import { useView } from '../engine/selectors'
 import { useDemo } from '../engine/store'
 import type { HireView } from '../engine/derive'
-import { addBiz, fmtDay, fmtShort, fmtWeekdayShort, rel } from '../lib/dates'
+import { addBiz, fmtDay, fmtShort, fmtWeekdayShort, prevWeekday } from '../lib/dates'
 import { people } from '../data/people'
 import { PEPPER_VIDEO } from '../data/welcome'
 import { Button, Glyph, ReqTag } from '../ui/parts'
@@ -84,7 +84,7 @@ export function HireHome() {
                 </div>
               )}
               <div className="mt-1 text-[13px] font-medium text-white/85">{blocked ? `Not ${fmtWeekdayShort(h.start)}. ${people.maria.name.split(' ')[0]} will be in touch.` : fmtWeekdayShort(h.start)}</div>
-              {mayMove && <div className="mt-1 text-[12px] text-white/85">Your start date may move. {people.maria.name.split(' ')[0]} will confirm it with you by {fmtShort(addBiz(now, 2))}.</div>}
+              {mayMove && <div className="mt-1 text-[12px] text-white/85">Your start date may move. {people.maria.name.split(' ')[0]} will confirm it with you by {fmtShort(Math.max(now, Math.min(addBiz(now, 2), prevWeekday(h.start - 1))))}.</div>}
             </div>
             <Ring pct={pct} label={<><Num value={doneCount} />/{own.length}</>} aria={`${doneCount} of ${own.length} of your tasks done`} />
           </div>
@@ -109,7 +109,7 @@ export function HireHome() {
       )}
 
       {blocked && <WhatHappensNow v={v} handled={handled} />}
-      {!blocked && days > 0 && days <= 3 && <FirstDay v={v} title={`Your first day · ${fmtWeekdayShort(h.start)}`} />}
+      {!blocked && !mayMove && days > 0 && days <= 3 && <FirstDay v={v} title={`Your first day · ${fmtWeekdayShort(h.start)}`} />}
 
       <AnimatePresence mode="popLayout" initial={false}>
         {next ? (
@@ -151,12 +151,12 @@ export function HireHome() {
               {next.red && <Button variant="ghost" onClick={() => go({ name: 'help' })}>Need a hand?</Button>}
             </div>
           </motion.div>
-        ) : blocked || (days > 0 && days <= 3) ? null : (
+        ) : blocked || (!mayMove && days > 0 && days <= 3) ? null : (
           <motion.div key="none" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={springs.bouncy} className="flex items-center gap-3 rounded-[22px] border border-line bg-surface p-3.5 shadow-card">
             <Emoji name="party" size={40} float />
             <div>
-              <div className="font-semibold">{nextOpen ? `Nothing until ${fmtWeekdayShort(nextOpen.open!)}` : 'Nothing needs you right now'}</div>
-              <div className="mt-0.5 text-xs text-muted">{nextOpen ? `Next: ${nextOpen.def.hire?.label ?? nextOpen.name}, ${rel(nextOpen.open!, now)}.` : 'We will let you know when something does.'}</div>
+              <div className="font-semibold">{nextOpen && !(mayMove && nextOpen.open! >= h.start) ? `Nothing until ${fmtWeekdayShort(nextOpen.open!)}` : 'Nothing needs you right now'}</div>
+              <div className="mt-0.5 text-xs text-muted">{mayMove ? 'We’ll tell you as soon as your start date is confirmed.' : nextOpen ? `Then: ${nextOpen.def.hire?.label ?? nextOpen.name}.` : 'We will let you know when something does.'}</div>
             </div>
           </motion.div>
         )}

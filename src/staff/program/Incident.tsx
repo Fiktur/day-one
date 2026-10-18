@@ -33,7 +33,7 @@ function Incident({ sys }: { sys: SystemId }) {
   return (
     <div className="mb-4 flex flex-wrap items-start gap-3 rounded-2xl border border-dashed border-red/50 bg-red-soft/60 px-4 py-3 text-[13px]">
       <Emoji name="plug" size={30} />
-      <div className="min-w-0 flex-1">
+      <div className="min-w-[220px] flex-1">
         <div className="font-semibold">{name} isn't responding · since {fmtDay(st.down[sys]!)}</div>
         <p className="mt-0.5 text-muted">
           {affected.length ? `${affected.length} step${affected.length > 1 ? 's' : ''} can't be checked, for ${Array.from(new Set(affected.map((x) => x.view.person.name.split(' ')[0]))).join(', ')}.` : 'No open steps depend on it right now.'}

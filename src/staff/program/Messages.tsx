@@ -11,6 +11,7 @@ import { fmtDay, fmtShort, isWeekend, nextWeekday, wdName } from '../../lib/date
 import { Avatar, Button, Card, Pill, ReqTag, Chip } from '../../ui/parts'
 import { toast } from 'sonner'
 import { managerFor } from '../../engine/derive'
+import { FixButton, fixFor } from './fixes'
 import { Page, PageHeader } from '../StaffShell'
 import { MsgStatusPill } from './HireRecord'
 import { Segmented } from '../../ui/motion'
@@ -126,7 +127,11 @@ function NeedsYou({ all, onOpen }: { all: MsgInstance[]; onOpen: (m: MsgInstance
     if (m.status === 'waiting' && m.template.from === 'buddy' && v.hire.start - now <= 14) {
       const mgr = managerFor(v.hire, ctx).id
       const asked = st.nudges.some((n) => n.hireId === m.hireId && n.key === 'buddy')
-      return [{ m, why: `Waiting on ${people[mgr].name.split(' ')[0]} to pick a buddy. It should go out ${fmtShort(v.hire.start - 5)}.`, action: <Button size="xs" variant="primary" disabled={asked} onClick={() => { st.nudge(m.hireId, 'buddy', people[mgr].name, viewer); toast.success(`Nudge sent to ${people[mgr].name}`, { description: 'With a link to the buddy picker.' }) }}>{asked ? 'Nudged' : `Nudge ${people[mgr].name.split(' ')[0]}`}</Button> }]
+      // Same rule as everywhere else: an absent manager gets "Reassign", not a nudge they won't read.
+      const action = fixFor(v, v.by.buddy, st, viewer)
+        ? <FixButton v={v} s={v.by.buddy} />
+        : <Button size="xs" variant="primary" disabled={asked} onClick={() => { st.nudge(m.hireId, 'buddy', people[mgr].name, viewer); toast.success(`Nudge sent to ${people[mgr].name}`, { description: 'With a link to the buddy picker.' }) }}>{asked ? 'Nudged today' : `Nudge ${people[mgr].name.split(' ')[0]}`}</Button>
+      return [{ m, why: `Waiting on ${people[mgr].name.split(' ')[0]} to pick a buddy${v.by.buddy?.ownerAway ? `, who is out of office` : ''}. It should go out ${fmtShort(v.hire.start - 5)}.`, action }]
     }
     return []
   })

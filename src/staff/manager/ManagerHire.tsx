@@ -24,7 +24,8 @@ export function ManagerHire() {
   const board = useDemo((s) => s.boards[route.hireId ?? ''])
   const [editing, setEditing] = useState<string | null>(null)
   if (!v) return null
-  const prep = v.steps.filter((s) => s.def.area === 'prep' || (s.def.owner.type === 'manager' && s.def.stage <= 4))
+  // Once the hire has started, the manager's part is the ramp: confirm the first contribution, hold the check-in.
+  const prep = v.steps.filter((s) => s.def.area === 'prep' || (s.def.owner.type === 'manager' && s.def.stage <= 4) || (v.status === 'started' && (s.key === 'milestone' || s.key === 'checkin30')))
   const msgs = messagesFor(v, ctx, edits).filter((m) => m.template.from === 'manager' || m.template.from === 'buddy')
   const ball = v.balls.find((b) => b.holder?.id !== viewer) ?? v.primary
   const editingMsg = msgs.find((m) => m.key === editing)
@@ -64,6 +65,7 @@ export function ManagerHire() {
               <span className={cn('text-xs', ball.red ? 'text-red' : 'text-muted')}>· {lc(ball.label)}</span>
             </div>
           )}
+          {v.status === 'atrisk' && !prep.some((s) => s.holder?.id === viewer && s.red) && <p className="mt-2 text-xs text-muted">The start date is at risk. Maria Hill is on it; nothing needed from you yet. If the date moves, you'll be asked to approve it.</p>}
         </Card>
       )}
 
@@ -82,7 +84,7 @@ export function ManagerHire() {
       <div className={cn('grid gap-4', compact ? 'grid-cols-1' : 'grid-cols-[1.3fr_1fr]')}>
         <Card className="p-2">
           <div className="flex items-center justify-between px-2.5 pb-1 pt-2">
-            <h2 className="font-display text-base font-bold">Your prep <ReqTag ids="M2 M5" /></h2>
+            <h2 className="font-display text-base font-bold">{v.status === 'started' ? 'Your part' : 'Your prep'} <ReqTag ids="M2 M5" /></h2>
             <span className="text-xs text-muted">{prep.filter((s) => s.state === 'verified').length} of {prep.length} done</span>
           </div>
           {prep.map((s) => (

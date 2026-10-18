@@ -87,7 +87,7 @@ export function HirePortal({ frame }: { frame: 'phone' | 'none' }) {
       <DayOneMoment />
       {showNav && (
         <nav className="glass absolute inset-x-3 bottom-3 z-20 flex justify-around rounded-[22px] border border-white/80 px-1.5 py-1.5 shadow-lift ring-1 ring-ink/5" aria-label="Portal">
-          {(v.status === 'started' && now - v.hire.start >= 14 ? TABS.filter((t) => t.name !== 'welcome').map((t) => (t.name === 'tasks' ? { ...t, label: 'Ramp' } : t)) : TABS).map((t) => {
+          {(v.status === 'started' && now - v.hire.start >= 14 ? TABS.filter((t) => t.name === 'home' || t.name === 'help') : TABS).map((t) => {
             const on = route.name === t.name || (t.name === 'home' && ['firstweek', 'people', 'company'].includes(route.name)) || (t.name === 'tasks' && ['details', 'laptop'].includes(route.name))
             const badge = t.name === 'tasks' ? own.length : t.name === 'welcome' ? boardNew : 0
             return (

@@ -17,7 +17,7 @@ import { startLine } from '../shared/summaries'
 import { Reveal, Tilt } from '../../ui/motion'
 
 export function MyHires() {
-  const { viewer, go, compact } = useNav()
+  const { viewer, go, compact, person } = useNav()
   const views = useViews()
   const now = useDemo((s) => s.now)
   const ctx = useCtx()
@@ -33,7 +33,7 @@ export function MyHires() {
     const first = v.person.name.split(' ')[0]
     if (v.status === 'withdrawn') return [{ v, emoji: 'envelope', title: `${first} withdrew on ${fmtShort(v.hire.withdrawn!)}.`, text: 'Nothing needed from you. Open steps closed and messages stopped.' }]
     const p = v.primary
-    if (v.status === 'atrisk' && p?.holder && !(p.holder.kind === 'person' && p.holder.id === viewer)) return [{ v, emoji: 'warning', title: `${first}'s start date is at risk.`, text: `Waiting on ${refName(p.holder)}: ${lc(p.label)}. Maria Hill is on it; nothing needed from you yet.` }]
+    if (v.status === 'atrisk' && p?.holder && !q.move.some((x) => x.view.hire.id === v.hire.id)) return [{ v, emoji: 'warning', title: `${first}'s start date is at risk.`, text: `Waiting on ${refName(p.holder)} for ${lc(safeName(p, { role: person.role }))} (${lc(p.label)}). Maria Hill is on it; nothing needed from you yet.` }]
     return []
   })
 

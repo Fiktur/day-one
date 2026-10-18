@@ -25,6 +25,11 @@ export function coverFor(managerId: string, ooo: DemoState['ooo'], now: number):
 export function fixFor(v: HireView, s: StepView | null, st: DemoState, viewer: string): Fix | null {
   if (!s || !s.holder) return null
   const first = v.person.name.split(' ')[0]
+  const me = people[viewer]
+  // The onboarding team unsticks anything; a team only chases its own vendor; everyone else just sees the state.
+  if (me?.role === 'team') {
+    if (!(s.red && s.holder.kind === 'provider' && s.holder.steward === me.team)) return null
+  } else if (me?.role !== 'program') return null
   if (s.ownerAway && s.holder.kind === 'person') {
     const to = coverFor(s.holder.id, st.ooo, st.now)
     if (!to) return null
@@ -41,10 +46,16 @@ export function fixFor(v: HireView, s: StepView | null, st: DemoState, viewer: s
   return { label: `Nudge ${callName(s.holder)}`, run: () => { st.nudge(v.hire.id, s.key, refName(s.holder!), viewer); toast.success(`Nudge sent to ${refName(s.holder!)}`, { description: 'They get a reminder with a link straight to this step.' }) } }
 }
 
+const DONE: Record<string, string> = { Chase: 'Chased', Nudge: 'Nudged', Notify: 'Managers told' }
+
 export function FixButton({ v, s, size = 'xs', variant = 'primary' }: { v: HireView; s: StepView | null; size?: 'xs' | 'sm'; variant?: 'primary' | 'secondary' }) {
   const { viewer } = useNav()
   const st = useDemo()
   const fix = fixFor(v, s, st, viewer)
-  if (!fix) return null
+  if (!fix || !s) return null
+  // A nudge or chase sent today stays visible on the card, so nobody sends it twice.
+  const sent = st.nudges.some((n) => n.hireId === v.hire.id && n.key === s.key && n.day === st.now)
+  const verb = fix.label.split(' ')[0]
+  if (sent && DONE[verb]) return <Button size={size} variant="ghost" disabled>{DONE[verb]} today</Button>
   return <Button size={size} variant={variant} onClick={(e) => { e.stopPropagation(); burst('small', e.currentTarget); fix.run() }}>{fix.label}</Button>
 }

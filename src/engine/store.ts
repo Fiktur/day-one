@@ -65,7 +65,7 @@ interface Data {
   down: Partial<Record<SystemId, number>>
   forced: Forced[]
   hires: Record<string, HireMut>
-  ooo: Record<string, { until: number; delegate: string | null }>
+  ooo: Record<string, { until: number; delegate: string | null; since?: number }>
   laptopModel: Record<string, string>
   addresses: Record<string, string>
   boards: Record<string, Board>
@@ -300,7 +300,7 @@ export const useDemo = create<DemoState>()((set, get) => ({
   delegate: (managerId, delegateId) => {
     const s = get()
     const cur = s.ooo[managerId] ?? { until: s.now + 14, delegate: null }
-    set({ ooo: { ...s.ooo, [managerId]: { ...cur, delegate: delegateId } } })
+    set({ ooo: { ...s.ooo, [managerId]: { ...cur, delegate: delegateId, since: s.now } } })
     get().addLog(entry(s.now, hhmm(), 'day one', 'delegation.set', `${nameOf(managerId)} → ${delegateId ? nameOf(delegateId) : 'nobody'} until ${fmtShort(cur.until)}`, 'info'))
   },
 

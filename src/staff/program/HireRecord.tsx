@@ -72,7 +72,7 @@ export function HireRecord() {
           <div className="px-2.5 pb-2 pt-2"><StageTrack stage={v.stage} labels /></div>
           {team && team !== 'screening' && (
             <div className="flex items-center justify-between rounded-lg bg-bg px-2.5 py-1.5 text-xs text-muted">
-              <span>{scoped ? `${teams[team].name}'s steps and what they wait on` : 'The full journey'}</span>
+              <span>{scoped ? `Steps for ${teams[team].name}, and what they wait on` : 'The full journey'}</span>
               <button type="button" onClick={() => setFull(!full)} className="font-medium text-accent">{scoped ? 'Show full journey' : `Only ${teams[team].short}`}</button>
             </div>
           )}
@@ -100,7 +100,7 @@ export function HireRecord() {
 
         <div className="space-y-3">
           <Card className="p-1">
-            <div className="flex gap-1 border-b border-line px-2 pt-1 text-[13px]">
+            <div className="scroll-thin flex gap-1 overflow-x-auto border-b border-line px-2 pt-1 text-[13px]">
               {[['next', 'What’s next'], ['readiness', 'Readiness'], ['evidence', 'Evidence'], ['messages', 'Messages'], ['activity', 'Activity']].map(([t, l]) => (
                 <button key={t} type="button" onClick={() => setTab(t)} className={cn('-mb-px whitespace-nowrap border-b-2 px-2 py-2', tab === t ? 'border-accent font-semibold' : 'border-transparent text-muted hover:text-ink')}>{l}</button>
               ))}
