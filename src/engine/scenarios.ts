@@ -163,7 +163,7 @@ export const SCENARIOS: Scenario[] = [
       const s = S()
       if (s.hires.wade.withdrawn != null) return
       s.withdraw('wade')
-      toast('Wade Wilson withdrew from the offer', { description: 'Scheduled messages stopped. IT and Screening each got one cancellation to do.' })
+      toast('Wade Wilson withdrew from the offer', { description: 'Scheduled messages stopped. IT got the laptop cancellation; the background check was cancelled with Checkr.' })
     },
   },
   {
