@@ -300,7 +300,7 @@ export const useDemo = create<DemoState>()((set, get) => ({
     get().addLog(
       entry(s.now, hhmm(), 'greenhouse', 'offer.withdrawn', `${nameOf(hireId)} · journey stopped`, 'warn', nameOf(hireId)),
       entry(s.now, hhmm(), 'day one', 'messages.stopped', `${nameOf(hireId)} · all scheduled messages stopped`, 'info', nameOf(hireId)),
-      entry(s.now, hhmm(), 'day one', 'tasks.created', `${nameOf(hireId)} · cancel laptop order (IT), cancel background check (Screening)`, 'info', nameOf(hireId)),
+      entry(s.now, hhmm(), 'day one', 'tasks.created', `${nameOf(hireId)} · cancel laptop order (IT) · background check cancelled with Checkr (Screening)`, 'info', nameOf(hireId)),
     )
   },
 

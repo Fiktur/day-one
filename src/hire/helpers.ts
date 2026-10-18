@@ -1,6 +1,6 @@
 import { managerFor, type HireView, type StepView } from '../engine/derive'
 import type { GlyphState } from '../ui/parts'
-import { addBiz, fmtDay, fmtShort, rel } from '../lib/dates'
+import { addBiz, fmtDay, fmtShort, prevWeekday, rel } from '../lib/dates'
 import { systemNames } from '../data/journey'
 import { people } from '../data/people'
 import { useDemo, type PlanDay } from '../engine/store'
@@ -13,6 +13,25 @@ export interface HandledItem {
   glyph: GlyphState
   text: string
   flashKeys: string[]
+}
+
+// What a waiting step is waiting on, in the hire's words.
+const WAIT_ON: Record<string, string> = { consent: 'you give consent', bg_complete: 'your background check', clearance: 'your background check', permit: 'your work permit', wd_hire: 'HR finishes your hire record', laptop_choice: 'you pick a model', details: 'you confirm your details' }
+
+/** The first unfinished thing a step waits on, walking back through its dependencies. */
+export function waitingOn(v: HireView, key: string): string | null {
+  for (const d of v.by[key]?.def.deps ?? []) {
+    const x = v.by[d]
+    if (!x || x.state === 'verified' || x.state === 'na') continue
+    return waitingOn(v, d) ?? WAIT_ON[d] ?? null
+  }
+  return null
+}
+
+/** When the onboarding team promises to confirm a shaky start date. Fixed dates, so the promise doesn't slide day by day. */
+export function confirmBy(start: number, now: number): number {
+  const weekBefore = prevWeekday(start - 7)
+  return now <= weekBefore ? weekBefore : now < start ? prevWeekday(start - 1) : addBiz(start, 2)
 }
 
 /** Company-side work, in the hire's words. Never red: delays read "taking longer than usual". */
@@ -51,13 +70,14 @@ export function handledFor(v: HireView, now: number, laptopModel?: string): Hand
     const ship = b.laptop_ship
     const del = b.laptop_deliver
     let glyph: GlyphState = 'blank'
-    let text = v.hire.rehire ? 'Your returned laptop will be reissued after your background check' : 'Ships after your background check'
+    const wait = waitingOn(v, 'laptop_release')
+    let text = v.hire.rehire ? `Your returned laptop will be reissued${wait ? ` after ${wait}` : ' soon'}` : wait ? `Ships after ${wait}` : 'Ordering soon'
     const arrive = del?.ver != null ? fmtDay(del.ver) : null
     if (b.laptop_received?.state === 'verified') { glyph = 'verified'; text = 'Arrived' }
     else if (del?.state === 'verified') { glyph = 'verified'; text = `Delivered ${rel(del.ver!, now)}` }
     else if (ship?.state === 'verified') { glyph = 'prog'; text = `On its way · arrives ${arrive ? rel(del!.ver!, now) : 'soon'}` }
-    else if (prep?.eta != null && prep.state !== 'verified') { glyph = 'prog'; text = `Taking longer than usual · we'll update you by ${fmtDay(Math.min(prep.eta, addBiz(now, 2)))}` }
-    else if (prep && prep.state !== 'blank') { glyph = 'prog'; text = `Being set up for you${arrive ? ` · arrives around ${fmtShort(del!.ver!)}` : ''}` }
+    else if (prep?.eta != null && prep.state !== 'verified') { glyph = 'prog'; text = `Taking longer than usual · we'll update you by ${fmtDay(Math.min(prep.eta, confirmBy(v.hire.start, now)))}` }
+    else if (prep && prep.state !== 'blank') { glyph = 'prog'; text = `Being set up for you${arrive ? ` · arrives around ${fmtShort(del!.ver!)}${del!.ver! >= v.hire.start ? ', after your start date' : ''}` : ''}` }
     else if (rel_.state === 'verified') {
       glyph = 'prog'
       const waitingOnPermit = permit && permit.state !== 'verified' && permit.state !== 'na'
@@ -71,7 +91,8 @@ export function handledFor(v: HireView, now: number, laptopModel?: string): Hand
   const acct = b.account
   if (acct) {
     let glyph: GlyphState = 'blank'
-    let text = 'Created after your background check'
+    const wait = waitingOn(v, 'account')
+    let text = wait ? `Created after ${wait}` : 'Being set up soon'
     if (acct.state === 'verified') { glyph = 'verified'; text = 'Ready on day one' }
     else if (acct.state !== 'blank') { glyph = 'prog'; text = 'Being created' }
     out.push({ key: 'account', label: 'Work account', glyph, text, flashKeys: ['wd_hire', 'account'] })

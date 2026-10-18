@@ -16,7 +16,7 @@ import { burst } from '../ui/fx'
 import { Emoji, type EmojiName } from '../ui/assets'
 import { motion, springs } from '../ui/motion'
 import { ShipTracker } from './Home'
-import { buddyOf, usePlan } from './helpers'
+import { buddyOf, confirmBy, usePlan } from './helpers'
 
 export function FirstWeek() {
   const { viewer } = useNav()
@@ -28,6 +28,9 @@ export function FirstWeek() {
   const planReady = v.by.first_week?.state === 'verified'
   const { plan } = usePlan(v)
   const days = plan.map((items, i) => ({ d: h.start + i, items: items.map((x) => [x.t, x.l]) }))
+  if (now >= h.start && v.status === 'atrisk') {
+    return <div className="px-4 pb-6"><div className="rounded-2xl bg-sunken px-3.5 py-3 text-[13px] text-muted">Your first week moves with your new start date. {people.maria.name.split(' ')[0]} will share it once the date is confirmed, by {fmtDay(confirmBy(h.start, now))}.</div></div>
+  }
   return (
     <div className="space-y-3 px-4 pb-6">
       {!planReady && (
@@ -215,6 +218,7 @@ export function LaptopPage() {
   const set = useDemo((s) => s.set)
   const laptopModel = useDemo((s) => s.laptopModel)
   const chosen = v.by.laptop_choice?.state === 'verified'
+  const arrives = v.by.laptop_deliver?.state === 'verified' ? null : v.by.laptop_deliver?.ver
   const options = ['MacBook Pro 14"', 'MacBook Pro 16"', 'ThinkPad X1 Carbon']
   const [pick, setPick] = useState(model)
   const track = [
@@ -265,7 +269,9 @@ export function LaptopPage() {
               )
             })}
           </ol>
-          <p className="flex items-start gap-2 px-1 text-xs text-muted"><Emoji name="key" size={18} className="shrink-0" />Arrives set up and enrolled. On {fmtWeekdayShort(v.hire.start)} you just sign in.</p>
+          <p className="flex items-start gap-2 px-1 text-xs text-muted"><Emoji name="key" size={18} className="shrink-0" />{arrives != null && arrives >= v.hire.start
+            ? `Taking longer than usual: expected ${fmtDay(arrives)}, after your start date. ${people.maria.name.split(' ')[0]} will tell you the plan for day one by ${fmtDay(confirmBy(v.hire.start, now))}.`
+            : `Arrives set up and enrolled. On ${fmtWeekdayShort(v.hire.start)} you just sign in.`}</p>
           <Button variant="secondary" size="md" className="w-full" onClick={() => go({ name: 'help' })}><MapPin className="h-4 w-4" />Change the delivery address</Button>
         </>
       )}

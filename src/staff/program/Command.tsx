@@ -12,7 +12,7 @@ import { isMine } from '../../ui/StepRow'
 import { Page, PageHeader } from '../StaffShell'
 import { AnimatePresence, LayoutGroup, Num, Reveal, Segmented, Tilt, motion, springs } from '../../ui/motion'
 import { Emoji, type EmojiName } from '../../ui/assets'
-import { FixButton } from './fixes'
+import { FixButton, fixFor } from './fixes'
 import { IncidentCards } from './Incident'
 
 type ViewMode = 'list' | 'board' | 'calendar'
@@ -53,8 +53,8 @@ export function Command() {
       />
       <IncidentCards />
       <div className={cn('mb-4 grid gap-3', compact ? 'grid-cols-2' : 'grid-cols-5')}>
-        {startA != null && <Stat i={0} emoji="calendar" label={`Starting ${fmtShort(startA)}`} value={count(startA)} on={only === startA} onClick={() => toggle(startA)} />}
-        {startB != null && <Stat i={1} emoji="rocket" label={`Starting ${fmtShort(startB)}`} value={count(startB)} on={only === startB} onClick={() => toggle(startB)} />}
+        {!compact && startA != null && <Stat i={0} emoji="calendar" label={`Starting ${fmtShort(startA)}`} value={count(startA)} on={only === startA} onClick={() => toggle(startA)} />}
+        {!compact && startB != null && <Stat i={1} emoji="rocket" label={`Starting ${fmtShort(startB)}`} value={count(startB)} on={only === startB} onClick={() => toggle(startB)} />}
         <Stat i={2} emoji="warning" label="Hires needing attention" value={red} tone={red ? 'red' : undefined} on={only === 'attention'} onClick={() => toggle('attention')} />
         <Stat i={3} emoji="plug" label="Can't check right now" value={unknown} tone={unknown ? 'dashed' : undefined} on={only === 'unknown'} onClick={() => toggle('unknown')} />
         {!compact && <Stat i={4} emoji="hourglass" label="Waiting to confirm" value={confirming} on={only === 'confirming'} onClick={() => toggle('confirming')} />}
@@ -62,15 +62,18 @@ export function Command() {
       <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
         <Chip on={only === 'all'} onClick={() => setOnly('all')}>Everyone</Chip>
         <Chip on={only === 'attention'} onClick={() => setOnly('attention')}>Needs attention</Chip>
-        <span className="mx-1 h-4 w-px bg-line" />
-        <Chip on={loc === 'all'} onClick={() => setLoc('all')}>All locations</Chip>
-        {groups.map((g) => <Chip key={g} on={loc === g} onClick={() => setLoc(g)}>{g}</Chip>)}
+        {/* On a phone the list comes first; location filters are a desktop nicety. */}
+        {!compact && <>
+          <span className="mx-1 h-4 w-px bg-line" />
+          <Chip on={loc === 'all'} onClick={() => setLoc('all')}>All locations</Chip>
+          {groups.map((g) => <Chip key={g} on={loc === g} onClick={() => setLoc(g)}>{g}</Chip>)}
+        </>}
       </div>
 
       {mode === 'list' && (
         <Card className="overflow-hidden">
           {!compact && (
-            <div className="grid grid-cols-[minmax(0,1.3fr)_64px_88px_minmax(0,1fr)_minmax(0,1.6fr)_116px_104px] gap-3 border-b border-line bg-bg px-4 py-2 font-mono text-[10px] uppercase tracking-wider text-faint">
+            <div className="grid grid-cols-[minmax(0,1.3fr)_64px_120px_minmax(0,1fr)_minmax(0,1.6fr)_116px_104px] gap-3 border-b border-line bg-bg px-4 py-2 font-mono text-[10px] uppercase tracking-wider text-faint">
               <span>Hire</span><span>Starts</span><span>Stage</span><span>Waiting on</span><span>Next step</span><span>Status</span><span className="sr-only">Action</span>
             </div>
           )}
@@ -133,6 +136,7 @@ export function Command() {
 function HireRow({ v, compact, onOpen }: { v: HireView; compact: boolean; onOpen: () => void }) {
   const { viewer, person } = useNav()
   const now = useDemo((s) => s.now)
+  const st = useDemo()
   const flash = useDemo((s) => Object.keys(s.flashes).some((k) => k.startsWith(v.hire.id + ':')))
   const p = v.balls.find((b) => b.red) ?? v.primary
   const coord = isCoordinator(viewer)
@@ -141,25 +145,25 @@ function HireRow({ v, compact, onOpen }: { v: HireView; compact: boolean; onOpen
   const tint = v.status === 'atrisk' ? 'bg-red-soft/50' : v.status === 'behind' ? 'bg-amber-soft/40' : v.status === 'unknown' ? 'bg-sunken/60' : ''
   if (compact) {
     return (
-      <button type="button" onClick={onOpen} className={cn('flex w-full items-center gap-3 border-b border-line px-3 py-2.5 text-left last:border-0', tint, flash && 'animate-flash')}>
-        <Avatar id={v.hire.id} size={26} />
+      <div onClick={onOpen} className={cn('flex w-full cursor-pointer items-center gap-3 border-b border-line px-3 py-2.5 text-left last:border-0', tint, flash && 'animate-flash')}>
+        <button type="button" onClick={(e) => { e.stopPropagation(); onOpen() }} aria-label={`Open ${v.person.name}`}><Avatar id={v.hire.id} size={26} /></button>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2"><span className="truncate text-[13px] font-medium">{v.person.name}</span><span className="text-xs text-muted">{fmtShort(v.hire.start)}</span></div>
           {p && <div className={cn('flex items-center gap-1.5 truncate text-xs', p.red ? 'text-red' : 'text-muted')}><Glyph state={ds} red={p.red} size={9} />{nextName} · {lc(p.label)}</div>}
         </div>
-        {p?.holder && <span className="min-w-0 max-w-[45%]"><BallChip step={p} now={now} size="sm" /></span>}
-      </button>
+        {p?.state !== 'unknown' && fixFor(v, p, st, viewer) ? <FixButton v={v} s={p} variant="secondary" /> : p?.holder && <span className="min-w-0 max-w-[45%]"><BallChip step={p} now={now} size="sm" /></span>}
+      </div>
     )
   }
   return (
     // The row opens the record on click; the name is the keyboard-reachable link, so the fix button never nests inside another button.
-    <div onClick={onOpen} className={cn('grid w-full cursor-pointer grid-cols-[minmax(0,1.3fr)_64px_88px_minmax(0,1fr)_minmax(0,1.6fr)_116px_104px] items-center gap-3 border-b border-line px-4 py-2.5 text-left last:border-0 hover:bg-bg', tint, flash && 'animate-flash')}>
+    <div onClick={onOpen} className={cn('grid w-full cursor-pointer grid-cols-[minmax(0,1.3fr)_64px_120px_minmax(0,1fr)_minmax(0,1.6fr)_116px_104px] items-center gap-3 border-b border-line px-4 py-2.5 text-left last:border-0 hover:bg-bg', tint, flash && 'animate-flash')}>
       <button type="button" onClick={(e) => { e.stopPropagation(); onOpen() }} className="flex min-w-0 items-center gap-2.5 text-left">
         <Avatar id={v.hire.id} size={28} />
         <span className="min-w-0"><span className="block truncate text-[13px] font-medium">{v.person.name}</span><span className="block truncate text-xs text-muted">{v.hire.title} · {groupFor(v.hire)}</span></span>
       </button>
       <span className="text-[13px] tnum">{v.status === 'withdrawn' ? '—' : fmtShort(v.hire.start)}{v.dateMoved && <span className="block text-[10px] text-muted">moved</span>}</span>
-      <span><StageTrack stage={v.stage} width={88} /><span className="mt-1 block truncate text-[10px] text-faint">{STAGES[v.stage]}</span></span>
+      <span><StageTrack stage={v.stage} width={88} /><span className="mt-1 block text-[10px] leading-tight text-faint">{STAGES[v.stage]}</span></span>
       <span className="min-w-0">{p?.holder ? <BallChip step={p} now={now} size="sm" /> : <span className="text-xs text-faint">—</span>}</span>
       <span className="flex min-w-0 items-center gap-2">
         {p && <Glyph state={ds} red={p.red} />}

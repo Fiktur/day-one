@@ -10,7 +10,8 @@ import { STATUS_LABEL, managerFor, refName, safeName, type HireView } from '../e
 import { queueFor } from '../engine/queues'
 import { messagesFor } from '../engine/messages'
 import { checkDates, hypothetical } from '../engine/startcheck'
-import { buddyOf } from '../hire/helpers'
+import { buddyOf, waitingOn } from '../hire/helpers'
+import { suggestedFixes } from '../staff/program/fixes'
 import { clockTime, entry } from '../engine/log'
 
 export interface AssistantAction {
@@ -36,12 +37,21 @@ export function suggestionsFor(viewer: string): string[] {
   switch (role) {
     case 'hire':
       return ["What's left for me to do?", 'When will my laptop arrive?', 'Change my laptop delivery address', 'What happens on my first day?', 'Is my background check done?', 'How do benefits work?']
-    case 'manager':
-      return ['What do I need to do this week?', 'Is Virgil on track for Nov 2?', 'Draft my welcome message for Virgil', 'Could Peter start a week earlier?']
+    case 'manager': {
+      // Only the viewer's own hires (or those they cover): the chips never suggest asking about someone else's.
+      const st = S()
+      const mine = Object.values(selectViews(st)).filter((v) => managerFor(v.hire, ctxOf(st)).id === viewer && v.hire.start > st.now && v.status !== 'withdrawn')
+      const [a, b] = [mine[0], mine[1] ?? mine[0]]
+      return ['What do I need to do this week?', ...(a ? [`Is ${first(a.hire.id)} on track for ${fmtShort(a.hire.start)}?`, `Draft my welcome message for ${first(a.hire.id)}`, `Could ${first(b.hire.id)} start a week earlier?`] : [])]
+    }
     case 'recruiter':
       return ['Where is Wanda in the process?', 'Is Nov 16 realistic for a Lisbon hire?', 'Who starts in the next two weeks?']
-    case 'program':
-      return ['Who is at risk for Nov 2?', 'Why is Hal at risk?', 'What messages go out tomorrow?', 'How many orientation seats are left?']
+    case 'program': {
+      const views = Object.values(selectViews(S()))
+      const risky = views.find((v) => v.status === 'atrisk') ?? views.find((v) => v.status === 'behind')
+      const next = views.filter((v) => v.hire.start > S().now && v.status !== 'withdrawn').sort((x, y) => x.hire.start - y.hire.start)[0]
+      return [...(next ? [`Who is at risk for ${fmtShort(next.hire.start)}?`] : []), ...(risky ? [`Why is ${first(risky.hire.id)} ${lc(STATUS_LABEL[risky.status])}?`] : []), 'What messages go out tomorrow?', 'How many orientation seats are left?']
+    }
     case 'team':
       return ['What can I start on today?', 'Which laptops must ship this week?', 'What is late?']
     case 'head':
@@ -69,7 +79,8 @@ function laptopStatus(v: HireView, now: number): { text: string; when: number | 
   if (b.laptop_ship?.state === 'verified') return { text: `It's on its way and should arrive ${rel(b.laptop_deliver?.ver ?? now + 3, now)}`, when: b.laptop_deliver?.ver ?? null }
   if (b.laptop_prep?.eta != null && b.laptop_prep.state !== 'verified') return { text: `It's taking longer than usual. The new estimate is ${fmtDay(b.laptop_deliver?.ver ?? b.laptop_prep.eta)}`, when: b.laptop_deliver?.ver ?? null }
   if (b.laptop_release?.state === 'verified') return { text: `It's being prepared now and should arrive around ${fmtDay(b.laptop_deliver?.ver ?? now + 5)}`, when: b.laptop_deliver?.ver ?? null }
-  return { text: `It ships after your background check. Based on recent hires, it should arrive around ${fmtDay(b.laptop_deliver?.ver ?? now + 8)}`, when: b.laptop_deliver?.ver ?? null }
+  const wait = waitingOn(v, 'laptop_release')
+  return { text: `It ships ${wait ? `after ${wait}` : 'soon'}. Based on recent hires, it should arrive around ${fmtDay(b.laptop_deliver?.ver ?? now + 8)}`, when: b.laptop_deliver?.ver ?? null }
 }
 
 function hireReply(viewer: string, q: string): AssistantReply {
@@ -124,7 +135,7 @@ function hireReply(viewer: string, q: string): AssistantReply {
   }
   if (/laptop/.test(t)) {
     const l = laptopStatus(v, now)
-    return { text: `${l.text}.`, bullets: [`Model: ${s.laptopModel[h.id] ?? h.laptop.model}`, `Delivering to: ${s.addresses[h.id] ?? h.laptop.address}`], sources: ['Firstbase · laptop order'], note: 'It arrives set up. On day one you just sign in.' }
+    return { text: `${l.text}.`, bullets: [`Model: ${s.laptopModel[h.id] ?? h.laptop.model}`, `Delivering to: ${s.addresses[h.id] ?? h.laptop.address}`], sources: ['Your laptop order'], note: (v.by.laptop_deliver?.ver ?? 0) >= h.start && v.by.laptop_deliver?.state !== 'verified' ? 'It lands after your start date. Maria will tell you the plan for day one.' : 'It arrives set up. On day one you just sign in.' }
   }
   if (/first day|day one|monday|orientation|start/.test(t)) {
     const sess = SESSIONS.find((x) => x.day === h.start && x.group === groupFor(h))
@@ -171,6 +182,9 @@ function managerReply(viewer: string, q: string): AssistantReply {
   const views = selectViews(s)
   const t = q.toLowerCase()
   const mineHires = Object.values(views).filter((v) => managerFor(v.hire, ctxOf(s)).id === viewer || v.hire.managerId === viewer)
+  // Need-to-know: a manager hears about their own hires only.
+  const named = findHire(q)
+  if (named && !mineHires.includes(named)) return { text: `${first(named.hire.id)} isn't one of your hires, so I can't share their progress.`, note: 'Maria Hill on the onboarding team can help if you need to know.' }
   if (/draft|welcome message|write/.test(t)) {
     const v = findHire(q, mineHires[0]?.hire.id) ?? mineHires[0]
     if (!v) return fallback()
@@ -230,19 +244,16 @@ function programReply(viewer: string, q: string): AssistantReply {
   const t = q.toLowerCase()
   if (/why/.test(t)) {
     const v = findHire(q, 'hal')!
-    const p = v.balls.find((b) => b.red) ?? v.primary
-    if (!p) return { text: `${first(v.hire.id)} isn't at risk right now.` }
-    const fixes: AssistantAction[] = []
-    if (v.hire.id === 'hal' && v.by.laptop_prep?.eta != null && v.by.laptop_prep.state !== 'verified') {
-      fixes.push({ label: 'Switch to an in-stock model', run: () => { S().speedUp('hal', 'laptop_prep', 1); S().set({ laptopModel: { ...S().laptopModel, hal: 'MacBook Pro 14" (in stock)' } }); return 'Done. Firstbase confirmed an in-stock MacBook Pro 14". Hal is back on track.' } })
-      fixes.push({ label: 'Move start to Nov 9', run: () => { S().setDialog({ type: 'changeDate', hireId: 'hal', to: v.hire.start + 7 }) } })
-    }
+    // The step that drives the status: a red critical one first, never a side task like emergency contacts.
+    const p = v.balls.find((b) => b.red && b.def.critical) ?? v.balls.find((b) => b.red) ?? v.primary
+    if (!p || (v.status !== 'atrisk' && v.status !== 'behind')) return { text: `${first(v.hire.id)} is ${lc(STATUS_LABEL[v.status])}. Nothing is holding them up.` }
+    const fixes: AssistantAction[] = suggestedFixes(v, S()).map((f) => ({ label: f.label, run: () => { f.run() } }))
     return {
-      text: `${first(v.hire.id)} is at risk because ${p.name.toLowerCase()} is ${lc(p.label)}.`,
+      text: `${first(v.hire.id)} is ${lc(STATUS_LABEL[v.status])}: ${lc(safeName(p, { role: 'program' }, { action: true }))} is ${lc(p.label)}.`,
       bullets: [
         `Waiting on ${p.holder ? refName(p.holder) : 'the owner'}${p.heldSince != null ? ` since ${fmtDay(p.heldSince)}` : ''}.`,
         v.forecastEnd != null ? `Forecast: the last critical step finishes ${fmtDay(v.forecastEnd)}, ${v.forecastEnd >= v.hire.start ? 'after' : 'before'} the start date (${fmtDay(v.hire.start)}).` : 'The forecast is waiting on a decision.',
-        ...(v.hire.id === 'hal' ? ['Options: an in-stock model ships in 1–2 days; local pickup in San Diego; or move the start a week.'] : []),
+        ...(fixes.length ? ['Options: an in-stock model ships in 1–2 days; local pickup in San Diego; or move the start a week.'] : []),
       ],
       actions: fixes,
       sources: ['Hire record · steps and forecast', 'Firstbase · order status'],
@@ -250,10 +261,15 @@ function programReply(viewer: string, q: string): AssistantReply {
     }
   }
   if (/risk|trouble|problem|attention/.test(t)) {
-    const list = Object.values(views).filter((v) => v.status === 'atrisk' || v.status === 'behind' || v.status === 'unknown')
+    // "for Nov 2" narrows the list to that start date.
+    const dated = Object.values(views).filter((v) => new RegExp(`\\b${fmtShort(v.hire.start).toLowerCase()}\\b`).test(t))
+    const list = (dated.length ? dated : Object.values(views)).filter((v) => v.status === 'atrisk' || v.status === 'behind' || v.status === 'unknown')
     return {
       text: list.length ? `${list.length} hire${list.length > 1 ? 's need' : ' needs'} attention.` : 'Nobody is at risk right now.',
-      bullets: list.map((v) => `${v.person.name} (${fmtShort(v.hire.start)}): ${(v.balls.find((b) => b.red) ?? v.primary)?.name.toLowerCase() ?? 'status unknown'}, ${(v.balls.find((b) => b.red) ?? v.primary)?.label.toLowerCase() ?? ''}`),
+      bullets: list.map((v) => {
+        const p = v.balls.find((b) => b.red && b.def.critical) ?? v.balls.find((b) => b.red) ?? v.primary
+        return `${v.person.name} (${fmtShort(v.hire.start)}, ${lc(STATUS_LABEL[v.status])}): ${p ? `${lc(safeName(p, { role: 'program' }, { action: true }))}, ${lc(p.label)}` : 'status unknown'}`
+      }),
       sources: ['Command center'],
     }
   }

@@ -109,7 +109,7 @@ export const HIRES: HireBase[] = [
     overrides: { consent: { doneAt: 8 } },
   },
   {
-    id: 'ted', title: 'Hardware Engineer', dept: 'Hardware Lab', managerId: 'bruce', recruiterId: 'kate',
+    id: 'ted', title: 'Hardware Engineer', dept: 'Hardware Lab', managerId: 'bruce', recruiterId: 'kate', buddyId: 'jane',
     location: 'Chicago office', mode: 'office', country: 'US', tz: 'Central time', offer: 2, start: 28, rehire: true,
     milestone: 'First lab validation signed off', boardTemplate: 'default',
     laptop: { model: 'Returned laptop NB-4471', address: 'Northbeam Chicago, 300 N LaSalle' },

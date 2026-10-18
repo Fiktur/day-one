@@ -23,7 +23,7 @@ function ProposeDate({ day, hireId }: { day: number; hireId?: string }) {
     const sent = st.nudges.some((n) => n.hireId === hireId && n.key === `start:${day}`)
     return <Button size="xs" variant="primary" disabled={sent} onClick={() => { st.nudge(hireId, `start:${day}`, 'Maria Hill', viewer); toast.success(`Proposed ${fmtDay(day)} to Maria Hill`, { description: 'She confirms the change; the hire hears from her, not from a system.' }) }}>{sent ? 'Proposed' : `Propose ${fmtDay(day)}`}</Button>
   }
-  const text = `Start date: ${fmtDay(day)}. Onboarding confirmed this date is achievable with current lead times.`
+  const text = `Start date: ${fmtDay(day)}. Day One's start-date check shows this date works with current lead times. The onboarding team confirms it once the offer is signed.`
   return <Button size="xs" variant="primary" onClick={() => { navigator.clipboard?.writeText(text).catch(() => {}); toast.success('Copied for the offer', { description: text }) }}>Copy for the offer</Button>
 }
 
@@ -34,13 +34,13 @@ const VERDICT: Record<DateCheck['verdict'], { label: string; tone: 'green' | 'am
 }
 
 export function StartCheck() {
-  const { viewer, person, compact } = useNav()
+  const { viewer, person, compact, route } = useNav()
   const views = useViews()
   const ctx = useCtx()
   const extra = useDemo((s) => s.extraSessions)
   const mine = Object.values(views).filter((v) => v.status !== 'started' && v.status !== 'withdrawn' && (person.role !== 'manager' || managerFor(v.hire, ctx).id === viewer || v.hire.managerId === viewer))
   const [mode, setMode] = useState<'hire' | 'new'>(person.role === 'recruiter' ? 'new' : 'hire')
-  const [hireId, setHireId] = useState(mine.find((m) => m.hire.id === 'wanda')?.hire.id ?? mine[0]?.hire.id)
+  const [hireId, setHireId] = useState(mine.find((m) => m.hire.id === (route.hireId ?? 'wanda'))?.hire.id ?? mine[0]?.hire.id)
   const [loc, setLoc] = useState<'remote' | 'nyc' | 'chicago' | 'lisbon' | 'london'>('lisbon')
   const [auth, setAuth] = useState(true)
 

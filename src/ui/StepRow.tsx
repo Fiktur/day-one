@@ -93,7 +93,8 @@ export function StepActions({ view, step, compact }: { view: HireView; step: Ste
   const { viewer, person } = useNav()
   const confirm = useDemo((s) => s.confirmStep)
   const markNA = useDemo((s) => s.markNA)
-  const mine = isMine(step, viewer)
+  // With manual updates, the team that runs a vendor records the vendor's steps itself.
+  const mine = isMine(step, viewer) || (step.mode === 'manual' && step.holder?.kind === 'provider' && step.holder.steward === person.team)
   const name = useStepName(step)
   if (!mine) return null
   const actionable = step.state === 'open' || step.state === 'soon' || step.state === 'late'
@@ -136,7 +137,7 @@ export function StepRow({ view, step, showHire, showHolder = true, showSource = 
   onOpen?: () => void
   dense?: boolean
 }) {
-  const { viewer } = useNav()
+  const { viewer, compact } = useNav()
   const now = useDemo((s) => s.now)
   const flash = useDemo((s) => `${view.hire.id}:${step.key}` in s.flashes)
   const mine = isMine(step, viewer)
@@ -161,13 +162,14 @@ export function StepRow({ view, step, showHire, showHolder = true, showSource = 
           {showSource && <SourceBadge system={step.def.system} mode={step.mode} />}
         </div>
         <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 text-xs text-muted">
-          <span className={cn('tnum', (step.state === 'late' || step.state === 'soon') && 'font-medium text-red', ds === 'open' && 'font-medium text-ink')}>{step.ownerAway && step.holder ? `${people[view.hire.managerId]?.name.split(' ')[0]} is out of office · ${lc(step.label)}` : step.label}</span>
+          <span className={cn('tnum', (step.state === 'late' || step.state === 'soon') && 'font-medium text-red', ds === 'open' && 'font-medium text-ink')}>{step.ownerAway && step.holder ? `${view.hire.managerId === viewer ? "You're" : `${people[view.hire.managerId]?.name.split(' ')[0]} is`} out of office · ${lc(step.label)}` : step.label}</span>
           {step.state === 'verified' && step.doneRecorded != null && step.done != null && step.doneRecorded !== step.done && (
             <span className="text-faint">happened {fmtDay(step.done)}, recorded {fmtDay(step.doneRecorded)}</span>
           )}
         </div>
       </button>
-      <div className="flex items-center gap-2">
+      {/* On a phone the chip and buttons drop under the name, so the name keeps its width. */}
+      <div className={cn('flex items-center gap-2', compact && 'col-span-2 col-start-2 flex-wrap')}>
         {showHolder && step.holder && !mine && <BallChip step={step} now={now} size="sm" />}
         {actions ?? <StepActions view={view} step={step} />}
       </div>

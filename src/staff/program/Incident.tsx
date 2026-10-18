@@ -1,7 +1,7 @@
 import { toast } from 'sonner'
 import { useNav } from '../../nav/NavContext'
 import { useDemo } from '../../engine/store'
-import { ctxOf, useViews } from '../../engine/selectors'
+import { ctxOf, selectViews, useViews } from '../../engine/selectors'
 import { managerFor } from '../../engine/derive'
 import { systemNames, type SystemId } from '../../data/journey'
 import { people } from '../../data/people'
@@ -14,6 +14,17 @@ import { burst } from '../../ui/fx'
 export function useAffected(sys: SystemId) {
   const views = useViews()
   return Object.values(views).flatMap((v) => v.steps.filter((s) => s.def.system === sys && s.state === 'unknown').map((step) => ({ view: v, step })))
+}
+
+/** Tells each affected hire's manager about the outage (one FYI each in the Outbox). Returns who was told. */
+export function notifyManagers(sys: SystemId, viewer: string): string[] {
+  const st = useDemo.getState()
+  const ctx = ctxOf(st)
+  const affected = Object.values(selectViews(st)).flatMap((v) => v.steps.filter((s) => s.def.system === sys && s.state === 'unknown').map((step) => ({ v, step })))
+  for (const x of affected) st.nudge(x.v.hire.id, x.step.key, people[managerFor(x.v.hire, ctx).id]?.name ?? 'manager', viewer)
+  const told = Array.from(new Set(affected.map((x) => managerFor(x.v.hire, ctx).id)))
+  toast.success(`Told ${told.length} manager${told.length > 1 ? 's' : ''} about the ${systemNames[sys]} delay`, { description: told.map((m) => people[m]?.name).join(', ') })
+  return told
 }
 
 /** While a system is down: since when, what it touches, what hires see, and one button to tell the managers. */
@@ -45,8 +56,7 @@ function Incident({ sys }: { sys: SystemId }) {
         {managers.length > 0 && (
           <Button size="xs" variant="primary" disabled={told} onClick={(e) => {
             burst('small', e.currentTarget)
-            for (const x of affected) st.nudge(x.view.hire.id, x.step.key, people[managerFor(x.view.hire, ctx).id]?.name ?? 'manager', viewer)
-            toast.success(`Told ${managers.length} manager${managers.length > 1 ? 's' : ''} about the ${name} delay`, { description: managers.map((m) => people[m]?.name).join(', ') })
+            notifyManagers(sys, viewer)
           }}>{told ? 'Managers told' : `Notify ${managers.length} manager${managers.length > 1 ? 's' : ''}`}</Button>
         )}
       </div>

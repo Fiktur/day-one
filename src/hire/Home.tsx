@@ -6,7 +6,7 @@ import { useNav } from '../nav/NavContext'
 import { useCtx, useView } from '../engine/selectors'
 import { useDemo } from '../engine/store'
 import { managerFor, type HireView } from '../engine/derive'
-import { addBiz, fmtDay, fmtShort, fmtWeekdayShort, prevWeekday } from '../lib/dates'
+import { fmtDay, fmtShort, fmtWeekdayShort } from '../lib/dates'
 import { people } from '../data/people'
 import { PEPPER_VIDEO } from '../data/welcome'
 import { Avatar, Button, Glyph, ReqTag } from '../ui/parts'
@@ -15,7 +15,7 @@ import { Emoji, STEP_EMOJI, type EmojiName } from '../ui/assets'
 import { HoldButton } from '../ui/hold'
 import { AnimatePresence, Num, Tilt, motion, springs } from '../ui/motion'
 import { useCelebrate } from '../ui/fx'
-import { buddyOf, handledFor, hireTaskLabel, isOwnActionable, usePlan, type HandledItem } from './helpers'
+import { buddyOf, confirmBy, handledFor, hireTaskLabel, isOwnActionable, usePlan, type HandledItem } from './helpers'
 import { systemNames } from '../data/journey'
 
 const HANDLED_EMOJI: Record<string, EmojiName> = { bg: 'shield', permit: 'globe', laptop: 'laptop', account: 'key', seat: 'calendar' }
@@ -50,7 +50,7 @@ export function HireHome({ wide }: { wide?: boolean }) {
   const slow = handled.filter((x) => x.text.startsWith('Taking longer'))
   const inMotion = handled.filter((x) => x.glyph === 'prog').length
 
-  if (started) return <StartedHome />
+  if (started) return wide ? <div className="mx-auto max-w-2xl"><StartedHome /></div> : <StartedHome />
 
   // The same sections stack on a phone and sit in two columns on a desktop, so the two layouts never drift apart.
   const left = (
@@ -85,7 +85,7 @@ export function HireHome({ wide }: { wide?: boolean }) {
                 </div>
               )}
               <div className="mt-1 text-[13px] font-medium text-white/85">{blocked ? `Not ${fmtWeekdayShort(h.start)}. ${people.maria.name.split(' ')[0]} will be in touch.` : fmtWeekdayShort(h.start)}</div>
-              {mayMove && <div className="mt-1 text-[12px] text-white/85">Your start date may move. {people.maria.name.split(' ')[0]} will confirm it with you by {fmtShort(Math.max(now, Math.min(addBiz(now, 2), prevWeekday(h.start - 1))))}.</div>}
+              {mayMove && <div className="mt-1 text-[12px] text-white/85">Your start date may move. {people.maria.name.split(' ')[0]} will confirm it with you by {fmtShort(confirmBy(h.start, now))}.</div>}
             </div>
             <Ring pct={pct} label={<><Num value={doneCount} />/{own.length}</>} aria={`${doneCount} of ${own.length} of your tasks done`} />
           </div>
@@ -95,7 +95,7 @@ export function HireHome({ wide }: { wide?: boolean }) {
             </span>
             <span className="min-w-0 truncate font-medium">{anyRed ? 'One thing needs you today' : blocked ? 'We’ll confirm your new date with you' : mayMove ? (actionable.length ? 'Keep going. We’ll confirm your date.' : 'Nothing you need to do right now') : actionable.length ? (companySlow ? "You're on track. One thing is with us." : "You're on track. Nothing late.") : "You're all set for now"}</span>
           </div>
-          {!blocked && <Emoji name="rocket" size={46} float className="absolute bottom-12 right-[92px] opacity-95" />}
+          {!blocked && !mayMove && <Emoji name="rocket" size={46} float className="absolute bottom-12 right-[92px] opacity-95" />}
         </motion.div>
       </Tilt>
 
@@ -103,7 +103,7 @@ export function HireHome({ wide }: { wide?: boolean }) {
         <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={springs.bouncy} className={cn('flex gap-3 rounded-2xl border border-accent/30 bg-accent-soft px-3.5 py-3 text-[13px]', flashes[`${viewer}:start`] && 'animate-flash')}>
           <Emoji name="calendar" size={30} />
           <div>
-            <div className="font-semibold">Your start date is now {fmtWeekdayShort(change.to)}</div>
+            <div className="font-semibold">Your start date is now {fmtWeekdayShort(change.to)} <span className="font-normal text-muted">(was {fmtShort(change.from)})</span></div>
             <p className="mt-0.5 text-muted">Everything below has been updated for the new date. Your manager will be in touch.</p>
           </div>
         </motion.div>
@@ -209,18 +209,7 @@ export function HireHome({ wide }: { wide?: boolean }) {
         </div>
       </motion.button>
 
-      <div className="flex flex-wrap gap-2">
-        {([
-          { name: 'firstweek', label: 'First week', emoji: 'calendar' },
-          { name: 'people', label: 'Your people', emoji: 'people' },
-          { name: 'company', label: 'Benefits', emoji: 'heart' },
-        ] as const).filter((x) => !(wide && x.name === 'people')).map((x) => (
-          <motion.button key={x.name} whileTap={{ scale: 0.94 }} whileHover={{ y: -1.5 }} transition={springs.bouncy} type="button" onClick={() => go({ name: x.name })} className="flex items-center gap-1.5 rounded-full border border-line bg-surface py-1.5 pl-2 pr-3 text-[13px] font-semibold shadow-card">
-            <Emoji name={x.emoji} size={20} />
-            {x.label}
-          </motion.button>
-        ))}
-      </div>
+      <QuickLinks names={wide ? ['firstweek', 'company'] : ['firstweek', 'people', 'company']} />
     </>
   )
   if (wide) {
@@ -232,6 +221,27 @@ export function HireHome({ wide }: { wide?: boolean }) {
     )
   }
   return <div className="space-y-3.5 px-4 pb-4">{left}{right}</div>
+}
+
+const LINKS: Record<string, { label: string; emoji: EmojiName }> = {
+  firstweek: { label: 'First week', emoji: 'calendar' },
+  people: { label: 'Your people', emoji: 'people' },
+  company: { label: 'Benefits', emoji: 'heart' },
+  welcome: { label: 'Welcome board', emoji: 'heart' },
+}
+
+function QuickLinks({ names }: { names: string[] }) {
+  const { go } = useNav()
+  return (
+    <div className="flex flex-wrap gap-2">
+      {names.map((name) => (
+        <motion.button key={name} whileTap={{ scale: 0.94 }} whileHover={{ y: -1.5 }} transition={springs.bouncy} type="button" onClick={() => go({ name })} className="flex items-center gap-1.5 rounded-full border border-line bg-surface py-1.5 pl-2 pr-3 text-[13px] font-semibold shadow-card">
+          <Emoji name={LINKS[name].emoji} size={20} />
+          {LINKS[name].label}
+        </motion.button>
+      ))}
+    </div>
+  )
 }
 
 /** Desktop only: the people around the hire, one click from the full page. */
@@ -262,7 +272,7 @@ function FirstDay({ v, title }: { v: HireView; title: string }) {
       </ol>
       {session && (
         <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted">
-          <span>{remote ? `Orientation link opens at 8:45, ${session.time.split('–')[0]}` : `${session.where}. Front desk from 8:45 for your badge.`}</span>
+          <span>{remote ? `Orientation starts at ${session.time.split('–')[0]}. The link opens at 8:45.` : `${session.where}. Front desk from 8:45 for your badge.`}</span>
           {remote && <Button size="xs" onClick={() => toast('Opens the orientation call in a new tab', { description: 'The same link is in your calendar invite.' })}>Join</Button>}
         </div>
       )}
@@ -287,7 +297,7 @@ function WhatHappensNow({ v, handled }: { v: HireView; handled: HandledItem[] })
       <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.12em] text-faint">What happens now</div>
       <ol className="space-y-2 text-[13px]">
         {open.map((x) => <li key={x.key} className="flex gap-2"><Glyph state={x.glyph} size={14} className="mt-0.5" /><span><span className="font-semibold">{x.label}:</span> <span className="text-muted">{x.text}</span></span></li>)}
-        <li className="flex gap-2"><Glyph state="prog" size={14} className="mt-0.5" /><span><span className="font-semibold">New date:</span> <span className="text-muted">Maria Hill agrees it with {mgr} and tells you by {fmtShort(addBiz(now, 2))}.</span></span></li>
+        <li className="flex gap-2"><Glyph state="prog" size={14} className="mt-0.5" /><span><span className="font-semibold">New date:</span> <span className="text-muted">Maria Hill agrees it with {mgr} and tells you by {fmtShort(confirmBy(v.hire.start, now))}.</span></span></li>
         <li className="flex gap-2"><Glyph state="verified" size={14} className="mt-0.5" /><span className="text-muted">Your laptop, account and orientation seat move with the date. Nothing for you to do.</span></li>
       </ol>
     </div>
@@ -401,18 +411,23 @@ function StartedHome() {
       <div className="rounded-[22px] border border-line bg-surface p-3.5 shadow-card">
         <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.12em] text-faint">Your ramp <ReqTag ids="T10 X5" /></div>
         <ul className="space-y-2.5">
-          {ramp.map((s, i) => (
+          {ramp.map((s, i) => {
+            // On day one the day's own sessions read "Today", not done, until the day is over.
+            const today = now === v.hire.start && s.done === now
+            return (
             <motion.li key={s.key} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ ...springs.soft, delay: 0.05 * i }} className="flex items-center gap-3">
               <span className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-xl', s.state === 'verified' ? 'bg-green-soft' : 'bg-sunken')}><Emoji name={STEP_EMOJI[s.key] ?? 'target'} size={24} /></span>
               <div className="min-w-0 flex-1">
                 <div className="text-[13px] font-semibold">{s.key === 'checkin30' ? `30-day check-in with ${people[v.hire.managerId].name.split(' ')[0]}` : s.def.hire?.label ?? s.name}</div>
-                <div className="text-xs text-muted">{hireTaskLabel(s, v, now)}{s.key === 'milestone' && s.state === 'verified' ? ` · confirmed by ${people[v.hire.managerId].name.split(' ')[0]}` : ''}</div>
+                <div className="text-xs text-muted">{today ? 'Today' : hireTaskLabel(s, v, now)}{s.key === 'milestone' && s.state === 'verified' ? ` · confirmed by ${people[v.hire.managerId].name.split(' ')[0]}` : ''}</div>
               </div>
-              <Glyph state={s.state} size={16} />
+              <Glyph state={today ? 'prog' : s.state} size={16} />
             </motion.li>
-          ))}
+            )
+          })}
         </ul>
       </div>
+      <QuickLinks names={['welcome', 'people', 'company']} />
       <p className="px-1 text-xs text-muted">Your first contribution is tracked separately from paperwork. It's agreed with your manager, not counted from clicks.</p>
       <Button variant="secondary" className="w-full" onClick={() => go({ name: 'help' })}>Ask a question</Button>
     </div>

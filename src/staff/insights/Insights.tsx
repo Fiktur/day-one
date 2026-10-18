@@ -24,13 +24,15 @@ export function Insights() {
   const [asTable, setAsTable] = useState(false)
   const extra = useDemo((s) => s.extraSessions)
   const addSession = useDemo((s) => s.addSession)
-  const atRisk = Object.values(views).filter((v) => v.status === 'atrisk').length
+  // Same rule as the Command center tile, so the two numbers always agree.
+  const atRisk = Object.values(views).filter((v) => v.status !== 'withdrawn' && (v.status === 'atrisk' || v.status === 'unknown' || v.balls.some((b) => b.red))).length
   const max = Math.max(...LEAD_TIMES.map((l) => l.p90))
   const lateRates = SLA_BY_OWNER.map((o) => ({ ...o, rate: o.breaches / o.total })).sort((a, b) => b.rate - a.rate)
   // One scale for every sparkline, so the rows can be compared with each other.
   const trendMax = Math.max(...SLA_BY_OWNER.flatMap((o) => o.trend))
   const weeks = PLANNED_STARTS.map((w) => ({ ...w, seats: w.seats + (extra.includes(w.day) ? 12 : 0) }))
   const capMax = Math.max(...weeks.map((w) => Math.max(w.planned, w.seats)))
+  const over = weeks.find((w) => w.planned > w.seats)
 
   return (
     <Page>
@@ -40,7 +42,7 @@ export function Insights() {
         <Kpi i={1} emoji="trophy" label="Ready on time" value={Math.round(HISTORY.readyOnTime * 100)} suffix="%" note="54 of 62" />
         <Kpi i={2} emoji="bell" label="Steps past SLA" value={HISTORY.stepsPastSla} note="this month" />
         <Kpi i={3} emoji="handshake" label="Hand-offs per hire" value={HISTORY.handoffsPerHire} note="across 6 teams" />
-        <div className={cn(compact && 'col-span-2')}><Kpi i={4} emoji="warning" label="At risk now" value={atRisk} note="of upcoming starts" tone={atRisk ? 'red' : undefined} /></div>
+        <div className={cn(compact && 'col-span-2')}><Kpi i={4} emoji="warning" label="Hires needing attention" value={atRisk} note="as on the Command center" tone={atRisk ? 'red' : undefined} /></div>
       </div>
       <div className={cn('grid gap-4', compact ? 'grid-cols-1' : 'grid-cols-2')}>
         <Card className="p-4">
@@ -66,7 +68,7 @@ export function Insights() {
               <h2 className="font-semibold">Orientation seats vs planned starts</h2>
               <p className="text-xs text-muted">From the headcount plan. Red means more starts than seats that week.</p>
             </div>
-            <Button size="xs" onClick={() => addSession(42)} disabled={extra.includes(42)}><Plus className="h-3 w-3" />Add Nov 16 session</Button>
+            {over ? <Button size="xs" onClick={() => addSession(over.day)}><Plus className="h-3 w-3" />Add {fmtShort(over.day)} session</Button> : <span className="text-xs text-muted">Enough seats every week</span>}
           </div>
           <div className="mt-4 grid h-44 grid-cols-5 items-end gap-4">
             {weeks.map((w) => {
@@ -114,7 +116,7 @@ export function Insights() {
         <Card className="p-4">
           <h2 className="flex items-center gap-2 font-semibold"><Lightbulb className="h-4 w-4 text-accent" />Make it easier to run</h2>
           <div className="mt-3 space-y-3">
-            {SUGGESTIONS.map((x) => {
+            {SUGGESTIONS.map((x, i) => {
               const done = assignments.find((a) => a.title === x.title)
               return (
                 <div key={x.title} className="rounded-lg bg-bg p-3">
@@ -124,7 +126,7 @@ export function Insights() {
                     <p className="text-xs font-medium text-green">{x.impact}</p>
                     {done
                       ? <span className="inline-flex items-center gap-1.5 text-xs text-muted"><Avatar id={done.to} size={18} />Assigned to {people[done.to].name.split(' ')[0]}</span>
-                      : <Button size="xs" variant="primary" onClick={(e) => { burst('small', e.currentTarget); assign(x.title, x.owner, viewer); toast.success(`Assigned to ${people[x.owner].name}`, { description: 'They get it as a Slack message with the numbers. See the Outbox.' }) }}>Assign to {people[x.owner].name.split(' ')[0]}</Button>}
+                      : <Button size="xs" variant={i === 0 ? 'primary' : 'secondary'} onClick={(e) => { burst('small', e.currentTarget); assign(x.title, x.owner, viewer); toast.success(`Assigned to ${people[x.owner].name}`, { description: 'They get it as a Slack message with the numbers. See the Outbox.' }) }}>Assign to {people[x.owner].name.split(' ')[0]}</Button>}
                   </div>
                 </div>
               )

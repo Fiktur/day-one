@@ -35,7 +35,8 @@ export function checkDates(base: HireState, ctx: DeriveCtx, count = 6, extraSess
       }
     }
     const group = groupFor(h)
-    const session = SESSIONS.some((x) => x.day === day && x.group === group) || extraSessions.includes(day) || group.startsWith('Remote')
+    // Remote and New York run orientation every Monday; the sessions listed are only the ones already booked.
+    const session = SESSIONS.some((x) => x.day === day && x.group === group) || extraSessions.includes(day) || group.startsWith('Remote') || group === 'New York office'
     let verdict: Verdict
     let reason: string
     if (end == null) {

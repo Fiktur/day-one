@@ -1,13 +1,14 @@
-import { cn } from '../../lib/cn'
+import { cn, plural } from '../../lib/cn'
+import { systemNames, type SystemId } from '../../data/journey'
 import { useNav } from '../../nav/NavContext'
 import { useDemo } from '../../engine/store'
 import { useViews } from '../../engine/selectors'
-import { queueFor, type QueueItem } from '../../engine/queues'
+import { factsFor, queueFor, type QueueItem } from '../../engine/queues'
 import { safeName } from '../../engine/derive'
 import { people, teams } from '../../data/people'
 import { toast } from 'sonner'
 import { FixButton } from '../program/fixes'
-import { fmtDay, fmtShort } from '../../lib/dates'
+import { fmtDay } from '../../lib/dates'
 import { Avatar, Button, Glyph, ReqTag, SourceBadge } from '../../ui/parts'
 import { StepActions } from '../../ui/StepRow'
 import { Page, PageHeader } from '../StaffShell'
@@ -24,6 +25,8 @@ export function Queue() {
   const groupId = useId()
   const q = queueFor(views, { team }, now)
   const viewer = { role: person.role, team: person.team }
+  const down = useDemo((s) => s.down)
+  const downHere = (Object.keys(down) as SystemId[]).filter((sys) => [...q.move, ...q.vendor].some((x) => x.step.def.system === sys && x.step.state === 'unknown'))
   // "Your move" always shows, so an empty queue reads as good news; the other column only when it has cards.
   const cols = ([
     { k: 'move', label: 'Your move', emoji: 'target' },
@@ -46,6 +49,13 @@ export function Queue() {
         sub={`What can we start on today?${teams[team].members.length > 1 ? ` Shared by ${teams[team].members.length} people.` : ''}`}
         tags={<ReqTag ids="O5 O7 O4" />}
       />
+      {/* A system this team relies on is down: say it once, above the cards it touches. */}
+      {downHere.map((sys) => (
+        <div key={sys} className="mb-3 flex items-start gap-2.5 rounded-2xl border border-dashed border-red/50 bg-red-soft/60 px-4 py-2.5 text-[13px]">
+          <Emoji name="plug" size={24} />
+          <span><span className="font-semibold">{systemNames[sys]} isn't responding.</span> <span className="text-muted">{plural([...q.move, ...q.vendor].filter((x) => x.step.def.system === sys && x.step.state === 'unknown').length, 'card')} below can't be checked. Day One retries every 5 minutes, and nothing turns red while it's down. Nothing to do yet.</span></span>
+        </div>
+      ))}
       <LayoutGroup id={groupId}>
         <div className={cn('grid gap-3', !compact && cols.length === 2 && 'grid-cols-2', !compact && cols.length === 3 && 'grid-cols-3')}>
           {cols.map((c) => (
@@ -102,21 +112,6 @@ function Fold({ emoji, title, note, children }: { emoji: EmojiName; title: strin
   )
 }
 
-/** What the person doing the step needs to know, without opening anything. No home addresses: the vendor has those. */
-function factsFor(v: QueueItem['view'], s: QueueItem['step'], model?: string): string | null {
-  const h = v.hire
-  const [first, last] = v.person.name.toLowerCase().split(' ')
-  switch (s.key) {
-    case 'laptop_release': case 'laptop_prep': case 'laptop_ship': case 'cancel_laptop':
-      return `${model ?? h.laptop.model} · ${h.location} · needed by ${fmtShort(h.start - 2)}`
-    case 'laptop_deliver': return `${h.location} · needed by ${fmtShort(h.start - 2)}`
-    case 'account': return `${first}.${last ?? ''}@northbeam.com${h.rehire ? ' · restore the old account' : ''} · by ${fmtShort(h.start - 1)}`
-    case 'badge': return `${h.location} · first day ${fmtShort(h.start)}`
-    case 'wd_hire': return `${h.title} · starts ${fmtShort(h.start)}`
-    default: return null
-  }
-}
-
 const QCard = forwardRef<HTMLDivElement, { x: QueueItem; col: string; onOpen: () => void }>(function QCard({ x, col, onOpen }, ref) {
   const { person, viewer } = useNav()
   const flash = useDemo((s) => `${x.view.hire.id}:${x.step.key}` in s.flashes)
@@ -143,10 +138,10 @@ const QCard = forwardRef<HTMLDivElement, { x: QueueItem; col: string; onOpen: ()
         <span className="min-w-0 flex-1 truncate font-semibold">{x.view.person.name}</span>
         <Glyph state={s.state} red={s.red} size={12} />
       </button>
-      <div className="mt-1.5">{safeName(s, { role: person.role, team: person.team }, { action: col === 'move' })}</div>
+      <div className="mt-1.5">{safeName(s, { role: person.role, team: person.team }, { action: col === 'move' || col === 'vendor' })}</div>
       <div className={cn('mt-0.5 text-xs', s.red ? 'font-medium text-red' : 'text-muted')}>
         {col === 'vendor' && s.holder ? `${s.holder.name} · ` : ''}{s.label}
-        {col === 'move' && s.def.critical ? ` · starts ${fmtDay(x.view.hire.start)}` : ''}
+        {col !== 'done' && s.def.critical ? (x.view.status === 'atrisk' ? ' · start date at risk' : ` · starts ${fmtDay(x.view.hire.start)}`) : ''}
       </div>
       {facts && <div className="mt-1 text-xs text-muted">{facts}</div>}
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
@@ -154,9 +149,9 @@ const QCard = forwardRef<HTMLDivElement, { x: QueueItem; col: string; onOpen: ()
           ? claimedBy
             ? <span className="inline-flex items-center gap-1.5 text-xs text-muted"><Avatar id={claimedBy} size={18} />{claimedBy === viewer ? 'You have it' : `${people[claimedBy]?.name.split(' ')[0]} has it`}</span>
             : <Button size="xs" variant="ghost" onClick={() => { claim(x.view.hire.id, s.key, viewer); toast.success(`You took “${safeName(s, { role: person.role, team: person.team }, { action: true })}”`, { description: `${x.view.person.name} · your teammates see it's yours` }) }}>Take it</Button>
-          : <SourceBadge system={s.def.system} mode={s.mode} />}
+          : s.state === 'unknown' ? <span className="rounded-full border border-dashed border-muted px-2 py-0.5 text-[11px] text-muted">{systemNames[s.def.system]} · can't check</span> : <SourceBadge system={s.def.system} mode={s.mode} />}
         {col === 'move' && <StepActions view={x.view} step={s} />}
-        {col === 'vendor' && <FixButton v={x.view} s={s} />}
+        {col === 'vendor' && (s.mode === 'manual' ? <StepActions view={x.view} step={s} /> : <FixButton v={x.view} s={s} />)}
       </div>
     </motion.div>
   )

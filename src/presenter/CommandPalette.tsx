@@ -3,11 +3,11 @@ import { Command } from 'cmdk'
 import * as D from '@radix-ui/react-dialog'
 import { Search } from 'lucide-react'
 import { useDemo, defaultRoute } from '../engine/store'
-import { useViews } from '../engine/selectors'
+import { ctxOf, useViews } from '../engine/selectors'
 import { SCENARIOS, runScenario } from '../engine/scenarios'
 import { people, personRoleLabel, switcherGroups } from '../data/people'
 import { Avatar, Glyph } from '../ui/parts'
-import { safeName } from '../engine/derive'
+import { managerFor, safeName, type HireView, type StepView } from '../engine/derive'
 import { Emoji, type EmojiName } from '../ui/assets'
 import { navFor } from '../staff/StaffShell'
 import type { Route } from '../engine/store'
@@ -42,19 +42,28 @@ export function CommandPalette() {
   const open = useDemo((s) => s.palette)
   const set = useDemo((s) => s.set)
   const views = useViews()
+  const main = useDemo((s) => s.main)
   const [q, setQ] = useState('')
   const close = () => { set({ palette: false }); setQ('') }
   const become = (id: string) => { set({ split: false, main: { viewer: id, route: defaultRoute(id) } }); close() }
   const openHire = (id: string) => { set({ split: false, main: { viewer: 'maria', route: { name: 'hire', hireId: id } } }); close() }
   const item = 'flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-[13px]'
+  // Steps are searched as the person on screen; the presenter (or a hire) searches as the onboarding team.
+  const onScreen = people[main.viewer]
+  const staff = onScreen && ['program', 'head', 'team', 'manager'].includes(onScreen.role)
+  const stepViewer = staff ? main.viewer : 'maria'
+  const me = staff ? { role: onScreen.role, team: onScreen.team } : { role: 'program' }
+  const ctx = ctxOf(useDemo.getState())
+  const seesHire = (v: HireView) => me.role !== 'manager' || managerFor(v.hire, ctx).id === stepViewer
+  const seesStep = (st: StepView) => me.role !== 'team' || [st.owner, st.holder].some((r) => r && ((r.kind === 'team' && r.id === me.team) || (r.kind === 'provider' && r.steward === me.team)))
   return (
-    <D.Root open={open} onOpenChange={(o) => set({ palette: o })}>
+    <D.Root open={open} onOpenChange={(o) => (o ? set({ palette: true }) : close())}>
       <D.Portal>
         <D.Overlay className="fixed inset-0 z-[90] bg-ink/30 backdrop-blur-[3px] data-[state=open]:animate-fade" />
         <D.Content className="fixed left-1/2 top-[14vh] z-[91] w-[580px] max-w-[calc(100vw-32px)] -translate-x-1/2 overflow-hidden rounded-[24px] border border-line bg-surface shadow-pop data-[state=open]:animate-pop-top">
           <D.Title className="sr-only">Command palette</D.Title>
           <D.Description className="sr-only">Jump to a person, hire or scenario</D.Description>
-          <Command label="Command palette" loop>
+          <Command label="Command palette" loop filter={(value, search) => (search.toLowerCase().split(/\s+/).filter(Boolean).every((w) => value.toLowerCase().includes(w)) ? 1 : 0)}>
             <div className="flex items-center gap-2 border-b border-line px-3">
               <Search className="h-4 w-4 text-faint" />
               <Command.Input autoFocus value={q} onValueChange={setQ} placeholder="Jump to a person, a hire, a step, or a scenario…" className="h-12 flex-1 bg-transparent text-[14px] outline-none placeholder:text-faint focus-visible:outline-none" />
@@ -79,10 +88,11 @@ export function CommandPalette() {
               {/* Steps only once the search has a word in it: there are hundreds, and the empty palette stays short. */}
               {q.trim().length >= 2 && (
                 <Command.Group heading="Steps">
-                  {Object.values(views).filter((v) => v.status !== 'withdrawn').flatMap((v) => v.steps.filter((s) => !s.def.cancel && s.state !== 'na').map((s) => {
-                    const name = safeName(s, { role: 'program' }, { action: true })
+                  {Object.values(views).filter((v) => v.status !== 'withdrawn' && seesHire(v)).flatMap((v) => v.steps.filter((s) => !s.def.cancel && s.state !== 'na' && seesStep(s)).map((s) => {
+                    // Need-to-know: names are masked for whoever is on screen, and only their own steps show.
+                    const name = safeName(s, me, { action: true })
                     return (
-                      <Command.Item key={v.hire.id + s.key} value={`step ${name} ${s.def.name} ${v.person.name} ${s.label}`} onSelect={() => { set({ split: false, main: { viewer: 'maria', route: { name: 'hire', hireId: v.hire.id, step: s.key } } }); close() }} className={item}>
+                      <Command.Item key={v.hire.id + s.key} value={`step ${name} ${v.person.name}`} onSelect={() => { set({ split: false, main: { viewer: stepViewer, route: { name: 'hire', hireId: v.hire.id, step: s.key } } }); close() }} className={item}>
                         <Glyph state={s.state} red={s.red} size={12} />
                         <span className="min-w-0 truncate">{name}</span>
                         <span className="ml-auto shrink-0 text-xs text-faint">{v.person.name.split(' ')[0]} · {s.label}</span>

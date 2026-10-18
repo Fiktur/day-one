@@ -42,6 +42,8 @@ export interface StepDef {
   sensitive?: 'screening' | 'immigration'
   when?: (h: HireBase & { withdrawn: number | null }) => boolean
   rename?: (h: HireBase) => string | undefined
+  /** The to-do form of the renamed step. */
+  renameTask?: string
   /** Typical business days from opening to done, and from done to confirmed. */
   typ?: number
   lag?: number
@@ -96,17 +98,17 @@ export const STEPS: StepDef[] = [
   { key: 'hello', name: 'Record a hello', stage: 1, area: 'prep', owner: { type: 'manager' }, system: 'dayone', deps: ['offer'], opens: -21, due: { rel: -8 }, confirm: 'instant', typ: 4, reqs: ['E10'] },
 
   // Stage 2 — Clearances
-  { key: 'bg_complete', name: 'Background check complete', stage: 2, area: 'employment', owner: { type: 'provider', id: 'checkr' }, system: 'checkr', deps: ['consent'], due: { sla: 7 }, confirm: 'system', typ: 5, lag: 0, critical: true, sensitive: 'screening',
+  { key: 'bg_complete', name: 'Background check complete', task: 'Complete background check', stage: 2, area: 'employment', owner: { type: 'provider', id: 'checkr' }, system: 'checkr', deps: ['consent'], due: { sla: 7 }, confirm: 'system', typ: 5, lag: 0, critical: true, sensitive: 'screening',
     hire: { label: 'Background check' }, safe: { open: 'Background check in progress', done: 'Background check complete' } },
   { key: 'clearance', name: 'Clearance recorded', task: 'Record clearance', stage: 2, area: 'employment', owner: { type: 'team', team: 'screening' }, system: 'dayone', deps: ['bg_complete'], due: { sla: 1 }, confirm: 'owner', typ: 0, critical: true, gate: true, sensitive: 'screening',
     safe: { open: 'Clearance in progress', done: 'Clearance complete' }, reqs: ['O9'] },
-  { key: 'permit', name: 'Work permit approved', stage: 2, area: 'employment', owner: { type: 'provider', id: 'immigration' }, system: 'immigration', deps: ['mobility_review'], due: { rel: -8 }, confirm: 'system', typ: 20, lag: 0, critical: true, gate: true, sensitive: 'immigration',
+  { key: 'permit', name: 'Work permit approved', task: 'Approve work permit', stage: 2, area: 'employment', owner: { type: 'provider', id: 'immigration' }, system: 'immigration', deps: ['mobility_review'], due: { rel: -8 }, confirm: 'system', typ: 20, lag: 0, critical: true, gate: true, sensitive: 'immigration',
     safe: { open: 'Work authorization in progress', done: 'Work authorization complete' } },
 
   // Stage 3 — Equipment and access
   { key: 'wd_hire', name: 'Hire record finalized', task: 'Finalize hire record', stage: 3, area: 'tools', owner: { type: 'team', team: 'hris' }, system: 'workday', deps: ['clearance', 'permit'], due: { sla: 2 }, confirm: 'system', typ: 1, lag: 0, critical: true },
   { key: 'account', name: 'Work account created', task: 'Create work account', stage: 3, area: 'tools', owner: { type: 'team', team: 'it' }, system: 'google', deps: ['wd_hire'], due: { sla: 2 }, confirm: 'system', typ: 1, lag: 0, critical: true,
-    rename: (h) => (h.rehire ? 'Work account restored' : undefined), hire: { label: 'Work account' } },
+    rename: (h) => (h.rehire ? 'Work account restored' : undefined), renameTask: 'Restore work account', hire: { label: 'Work account' } },
   { key: 'laptop_release', name: 'Laptop order released', task: 'Release laptop order', stage: 3, area: 'tools', owner: { type: 'team', team: 'it' }, system: 'firstbase', deps: ['clearance', 'laptop_choice', 'details'], due: { sla: 1 }, confirm: 'system', typ: 1, lag: 0, critical: true,
     rename: (h) => (h.rehire ? 'Reissue returned laptop' : undefined), reqs: ['E6'] },
   { key: 'laptop_prep', name: 'Laptop prepared and enrolled', task: 'Prepare and enroll laptop', stage: 3, area: 'tools', owner: { type: 'provider', id: 'firstbase' }, system: 'firstbase', deps: ['laptop_release', 'account'], due: { sla: 3 }, confirm: 'system', typ: 2, lag: 0, critical: true },

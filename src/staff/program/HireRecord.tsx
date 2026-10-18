@@ -16,7 +16,7 @@ import { StepRow } from '../../ui/StepRow'
 import { Page } from '../StaffShell'
 import { areaSummary } from '../shared/summaries'
 import { burst } from '../../ui/fx'
-import { FixButton } from './fixes'
+import { FixButton, suggestedFixes } from './fixes'
 
 export function HireRecord() {
   const { route, go, person, viewer, compact } = useNav()
@@ -67,6 +67,7 @@ export function HireRecord() {
         </div>
       </div>
 
+      <Proposal v={v} />
       <BallBanner v={v} pick={shown} />
 
       <div className={cn('grid gap-4', compact ? 'grid-cols-1' : 'grid-cols-[minmax(0,1.35fr)_minmax(320px,1fr)]')}>
@@ -80,8 +81,10 @@ export function HireRecord() {
           )}
           {stages.map(({ i, steps }) => {
             if (!steps.length) return null
-            const done = steps.filter((s) => s.state === 'verified' || s.state === 'na').length
-            const folded = done === steps.length && !openStages.includes(i)
+            // After a withdrawal, closed steps are stopped, not done.
+            const stopped = v.status === 'withdrawn'
+            const done = steps.filter((s) => s.state === 'verified' || (!stopped && s.state === 'na')).length
+            const folded = !stopped && done === steps.length && !openStages.includes(i)
             return (
             <div key={i} className="mt-1">
               <button type="button" onClick={() => setOpenStages((x) => (x.includes(i) ? x.filter((y) => y !== i) : [...x, i]))} className="flex w-full items-center justify-between rounded-md px-2.5 pb-1 pt-2 text-left hover:bg-bg">
@@ -103,12 +106,13 @@ export function HireRecord() {
         <div className="space-y-3">
           <Card className="p-1">
             <div className="scroll-thin flex gap-1 overflow-x-auto border-b border-line px-2 pt-1 text-[13px]">
-              {[['next', 'What’s next'], ['readiness', 'Readiness'], ['evidence', 'Evidence'], ['messages', 'Messages'], ['activity', 'Activity']].map(([t, l]) => (
+              {/* Background screening sees its own steps only: no readiness for other areas, no messages, no activity log. */}
+              {[['next', 'What’s next'], ['readiness', 'Readiness'], ['evidence', 'Evidence'], ['messages', 'Messages'], ['activity', 'Activity']].filter(([t]) => team !== 'screening' || t === 'next' || t === 'evidence').map(([t, l]) => (
                 <button key={t} type="button" onClick={() => setTab(t)} className={cn('-mb-px whitespace-nowrap border-b-2 px-2 py-2', tab === t ? 'border-accent font-semibold' : 'border-transparent text-muted hover:text-ink')}>{l}</button>
               ))}
             </div>
             <div className="p-3">
-              {tab === 'next' && <WhatsNext v={v} viewer={viewerCtx} ours={ours} shown={shown} onPick={(k) => { setSel(k); setTab('evidence') }} />}
+              {tab === 'next' && <WhatsNext v={v} viewer={viewerCtx} ours={ours} shown={shown} team={scoped ? team : undefined} onPick={(k) => { setSel(k); setTab('evidence') }} />}
               {tab === 'readiness' && <ReadinessTab v={v} />}
               {tab === 'evidence' && selected && <Evidence v={v} s={selected} viewer={viewerCtx} />}
               {tab === 'messages' && <MessagesTab v={v} />}
@@ -119,6 +123,21 @@ export function HireRecord() {
         </div>
       </div>
     </Page>
+  )
+}
+
+/** A manager's proposed start date, waiting on the onboarding team: the "Review" in their Slack ping lands here. */
+function Proposal({ v }: { v: HireView }) {
+  const { person } = useNav()
+  const st = useDemo()
+  const n = [...st.nudges].reverse().find((x) => x.hireId === v.hire.id && x.key.startsWith('start:'))
+  const day = n ? Number(n.key.slice(6)) : null
+  if (!n || day == null || person.role !== 'program' || v.hire.start === day || st.dateChanges.some((c) => c.hireId === v.hire.id && c.day >= n.day)) return null
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-accent/30 bg-accent-soft px-4 py-2.5 text-[13px]">
+      <span className="min-w-0 flex-1"><span className="font-semibold">{people[n.by]?.name} proposed starting on {fmtDay(day)}.</span> The start-date check says it's the earliest safe date.</span>
+      <Button size="xs" variant="primary" onClick={() => st.setDialog({ type: 'changeDate', hireId: v.hire.id, to: day })}>Move start to {fmtDay(day)}</Button>
+    </div>
   )
 }
 
@@ -133,12 +152,8 @@ function BallBanner({ v, pick }: { v: HireView; pick: (s: StepView) => boolean }
     return <div className="mb-4 rounded-xl border border-line bg-sunken px-4 py-3 text-[13px]"><span className="font-semibold">{v.person.name.split(' ')[0]} withdrew on {fmtDay(v.hire.withdrawn!)}.</span> Scheduled messages stopped. Open steps closed. Cancellations went to their owners.</div>
   }
   if (!p) return null
-  const hal = v.hire.id === 'hal' && v.by.laptop_prep?.eta != null && v.by.laptop_prep.state !== 'verified'
-  const fixes = hal ? [
-    { l: 'Switch to an in-stock model', run: () => { s.speedUp('hal', 'laptop_prep', 1); s.set({ laptopModel: { ...s.laptopModel, hal: 'MacBook Pro 14" (in stock)' } }); toast.success('Firstbase confirmed an in-stock MacBook Pro 14"', { description: 'Hal is back on track and will see the new model on the Day One home.' }) } },
-    { l: 'Local pickup in San Diego', run: () => { s.speedUp('hal', 'laptop_prep', 1); s.speedUp('hal', 'laptop_deliver', 0); s.set({ laptopModel: { ...s.laptopModel, hal: 'San Diego office stock' } }); toast.success('Pickup booked for Hal at the San Diego office', { description: 'IT reserved a laptop from office stock.' }) } },
-    { l: 'Move start to Nov 9', run: () => s.setDialog({ type: 'changeDate', hireId: 'hal', to: v.hire.start + 7 }) },
-  ] : []
+  // The fix button already carries the first suggested fix; the rest sit beside it.
+  const fixes = suggestedFixes(v, s).slice(person.role === 'program' && p.red && p.holder?.kind === 'provider' ? 1 : 0)
   const forecast = v.forecastEnd != null ? `Forecast: everything ready by ${fmtDay(v.forecastEnd)}, ${v.forecastEnd >= v.hire.start ? `${v.forecastEnd - v.hire.start + 1} day${v.forecastEnd - v.hire.start ? 's' : ''} after the start date` : `${v.hire.start - v.forecastEnd} days before the start`}.` : 'Forecast is waiting on a decision.'
   return (
     <div className={cn('mb-4 rounded-xl border px-4 py-3', red ? (v.risk ? 'border-red/40 bg-red-soft' : 'border-amber/40 bg-amber-soft') : 'border-line bg-surface')}>
@@ -151,8 +166,8 @@ function BallBanner({ v, pick }: { v: HireView; pick: (s: StepView) => boolean }
       <div className={cn('mt-1 text-xs', v.risk ? 'font-medium text-red' : 'text-muted')}>{forecast} <ReqTag ids="X2 O7" /></div>
       {fixes.length > 0 && (
         <div className="mt-2.5 flex flex-wrap gap-2">
-          <span className="self-center text-xs text-muted">Suggested fixes:</span>
-          {fixes.map((f, i) => <Button key={f.l} size="xs" variant="secondary" onClick={(e) => { if (i < 2) burst('big', e.currentTarget); f.run() }}>{f.l}</Button>)}
+          <span className="self-center text-xs text-muted">Other fixes:</span>
+          {fixes.map((f) => <Button key={f.label} size="xs" variant="secondary" onClick={(e) => { if (!f.label.startsWith('Move')) burst('big', e.currentTarget); f.run() }}>{f.label}</Button>)}
         </div>
       )}
     </div>
@@ -204,11 +219,11 @@ function Evidence({ v, s, viewer }: { v: HireView; s: StepView; viewer: { role: 
 }
 
 /** The next few hand-offs in order: who has each one now, and what opens after. */
-function WhatsNext({ v, viewer, ours, shown, onPick }: { v: HireView; viewer: { role: string; team?: TeamId }; ours: (s: StepView) => boolean; shown: (s: StepView) => boolean; onPick: (key: string) => void }) {
+function WhatsNext({ v, viewer, ours, shown, team, onPick }: { v: HireView; viewer: { role: string; team?: TeamId }; ours: (s: StepView) => boolean; shown: (s: StepView) => boolean; team?: TeamId; onPick: (key: string) => void }) {
   const now = useDemo((s) => s.now)
   const active = v.balls.filter(shown)
   const upcoming = v.steps.filter((s) => s.state === 'blank' && !s.def.cancel && s.def.stage <= 4 && shown(s)).sort((a, b) => (a.open ?? 999) - (b.open ?? 999)).slice(0, Math.max(0, 6 - active.length))
-  if (!active.length && !upcoming.length) return <p className="text-[13px] text-muted">{v.status === 'withdrawn' ? 'Nothing: the journey stopped when the offer was withdrawn.' : 'Nothing left before day one.'}</p>
+  if (!active.length && !upcoming.length) return <p className="text-[13px] text-muted">{v.status === 'withdrawn' ? 'Nothing: the journey stopped when the offer was withdrawn.' : team ? `Nothing left for ${teams[team].name}.` : 'Nothing left before day one.'}</p>
   const row = (s: StepView) => (
     <button key={s.key} type="button" onClick={() => onPick(s.key)} className="flex w-full items-start gap-2.5 rounded-lg px-2 py-1.5 text-left hover:bg-bg">
       <Glyph state={s.state} red={s.red} className="mt-0.5" />

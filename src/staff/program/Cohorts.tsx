@@ -30,10 +30,10 @@ export function Cohorts() {
   const sent = (x: Session) => (x.invitesSent != null && x.invitesSent <= now) || sentFor[x.id] != null
   const speakers = useDemo((st) => st.speakers)
   const confirmed = (x: Session, r: Session['run'][number]) => r.confirmed || speakers.includes(`${x.id}:${r.time}`)
-  // Invites go out 14 days before; a session needs Maria when they're due, a speaker is unconfirmed, or it's full.
+  // Invites go out 14 days before; inside that window a session needs Maria when invites are due or a speaker is unconfirmed. Full counts any time.
   const needs = (x: Session) => [
     !sent(x) && now >= x.day - 14 && 'Invites due',
-    x.run.some((r) => !confirmed(x, r)) && 'Speaker to confirm',
+    now >= x.day - 14 && x.run.some((r) => !confirmed(x, r)) && 'Speaker to confirm',
     taken(x) >= x.seats && 'Full',
   ].filter(Boolean) as string[]
 

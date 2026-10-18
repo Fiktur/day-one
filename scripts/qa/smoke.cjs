@@ -52,13 +52,14 @@ const check = (ok, msg) => { if (!ok) failures.push(msg); console.log(`${ok ? 'o
         }
       }
     }
-    // Across the weeks before the starts: "Behind" only with something overdue, and the stage never slides back.
+    // Across the weeks before the starts: "Behind" only with something overdue, "At risk" only when the forecast misses the date, and the stage never slides back.
     const last = {}
     for (let day = 10; day <= 27; day++) {
       st.setNow(day)
       for (const v of Object.values(sel.selectViews(window.__demo.getState()))) {
         if (v.status === 'withdrawn' || day >= v.hire.start) continue
-        if (v.status === 'behind' && !v.steps.some((s) => s.state === 'late' || /^Delayed/.test(s.label))) bad(`${v.person.name} is "Behind" on day ${day} with nothing overdue`)
+        if (v.status === 'behind' && !v.steps.some((s) => s.red && (s.state === 'late' || /^Delayed/.test(s.label) || s.ownerAway || s.state === 'confirming'))) bad(`${v.person.name} is "Behind" on day ${day} with nothing overdue`)
+        if (v.status === 'atrisk' && v.forecastEnd != null && v.forecastEnd < v.hire.start) bad(`${v.person.name} is "At risk" on day ${day} though the forecast lands before the start`)
         if (last[v.hire.id] != null && v.stage < last[v.hire.id]) bad(`${v.person.name}'s stage goes back on day ${day}`)
         last[v.hire.id] = v.stage
       }
@@ -223,6 +224,38 @@ const check = (ok, msg) => { if (!ok) failures.push(msg); console.log(`${ok ? 'o
   const propose = page.getByRole('button', { name: /^Propose / }).first()
   if (await propose.count()) { await propose.click(); await page.waitForTimeout(300) }
   check(await page.evaluate(() => window.__demo.getState().nudges.some((n) => n.key.startsWith('start:'))), 'a manager can propose the earliest safe start to Maria')
+
+  // ---- Rescore fixes: need-to-know, quiet Outbox, honest outage pings ----
+  await reset()
+  await show('shuri', { name: 'queue' })
+  await page.keyboard.press('Control+k')
+  await page.waitForTimeout(300)
+  await page.keyboard.type('permit')
+  await page.waitForTimeout(300)
+  const leak = await page.locator('[cmdk-group]:has([cmdk-group-heading]:has-text("Steps"))').innerText().catch(() => '')
+  await page.keyboard.press('Escape')
+  check(!/work permit/i.test(leak), `⌘K as IT doesn't show another team's work permit step${leak ? ` (${leak.slice(0, 80)})` : ''}`)
+
+  const asst = await page.evaluate(async () => (await import('/src/assistant/engine.ts')).respond('carol', 'Is Virgil on track?').text)
+  check(/isn't one of your hires/.test(asst), `the assistant won't tell a manager about someone else's hire ("${asst.slice(0, 60)}")`)
+
+  const pingsTo = (to) => page.evaluate(async (to) => {
+    const sel = await import('/src/engine/selectors.ts')
+    const { pingsFor } = await import('/src/engine/pings.ts')
+    const st = window.__demo.getState()
+    return pingsFor(sel.selectViews(st), st, sel.ctxOf(st)).filter((p) => p.to === to).map((p) => `${p.kind}:${p.title}`)
+  }, to)
+  check((await pingsTo('bruce')).length === 0, 'an out-of-office manager with no cover gets no pings')
+
+  await page.evaluate(async () => (await import('/src/engine/scenarios.ts')).runScenario(5))
+  await page.waitForTimeout(800)
+  await page.evaluate(async () => (await import('/src/staff/program/Incident.tsx')).notifyManagers('checkr', 'maria'))
+  const told = await pingsTo('tony')
+  check(told.length > 0 && told.every((t) => t.startsWith('fyi:')) && told.filter((t) => /Checkr/.test(t)).length === 1, `outage notice reaches a manager as one FYI, not a to-do per step (${told.join(' | ')})`)
+  await page.evaluate(async () => (await import('/src/engine/scenarios.ts')).runScenario(5))
+
+  const jen = await show('jennifer', { name: 'hire', hireId: 'virgil' })
+  check(!/Messages/.test(jen.split('What’s next')[1] ?? '') && !/Activity/.test(jen.split('What’s next')[1] ?? ''), 'Background screening sees no messages or activity on a hire record')
 
   // ---- All eight scenarios run without console errors ----
   await reset()

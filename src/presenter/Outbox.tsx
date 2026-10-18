@@ -12,23 +12,29 @@ import { Avatar, Button } from '../ui/parts'
 import { Select } from '../ui/overlay'
 import { AnimatePresence, Segmented, motion, springs } from '../ui/motion'
 import { burst } from '../ui/fx'
+import { notifyManagers } from '../staff/program/Incident'
+import type { SystemId } from '../data/journey'
 
 const CHANNEL_ICON: Record<Channel, typeof Mail> = { Slack: MessageSquare, Text: Smartphone, Email: Mail }
 
-function routeFor(viewer: string, hireId?: string): Route {
-  const role = people[viewer]?.role
-  if (role === 'hire') return { name: 'home' }
-  return hireId ? { name: 'hire', hireId } : defaultRoute(viewer)
+function routeFor(a: PingAction, p: Ping): Route {
+  if (people[a.by]?.role === 'hire') return { name: a.arg ?? 'home' }
+  if (p.key?.startsWith('assign:')) return { name: 'insights' }
+  if (p.key?.startsWith('cover:')) return { name: 'covering' }
+  return p.hireId ? { name: 'hire', hireId: p.hireId } : defaultRoute(a.by)
 }
 
 /** Each button does what the same button does inside the app; "Open" lands the right person on the right page. */
 function run(a: PingAction, p: Ping) {
   const s = useDemo.getState()
   const hire = p.hireId && people[p.hireId]?.name
+  // Whoever is on screen clicks the channel button if they're in that team; otherwise the team lead does.
+  const by = p.to in teams && teams[p.to as TeamId].members.includes(s.main.viewer) ? s.main.viewer : a.by
   switch (a.kind) {
-    case 'open': s.set({ split: false, main: { viewer: a.by, route: p.key?.startsWith('assign:') ? { name: 'insights' } : routeFor(a.by, p.hireId) } }); return
-    case 'take': s.claim(p.hireId!, p.key!, a.by); toast.success(`${people[a.by]?.name} took it`, { description: `${p.title} · from the team channel` }); return
-    case 'done': s.markDone(p.hireId!, p.key!, a.by); toast.success('Marked done from the notification', { description: `${hire} · nobody had to open Day One` }); return
+    case 'open': s.set({ split: false, main: { viewer: a.by, route: routeFor(a, p) } }); return
+    case 'take': s.claim(p.hireId!, p.key!, by); toast.success(`${people[by]?.name} took it`, { description: `${p.title} · from the team channel` }); return
+    case 'done': s.markDone(p.hireId!, p.key!, by); toast.success('Marked done from the notification', { description: `${hire} · nobody had to open Day One` }); return
+    case 'notify': notifyManagers(a.arg as SystemId, a.by); return
     case 'buddy': s.assignBuddy(p.hireId!, a.arg!, a.by); toast.success(`${people[a.arg!]?.name} is ${hire?.split(' ')[0]}'s buddy`, { description: 'Picked straight from Slack.' }); return
     case 'chase': s.nudge(p.hireId!, p.key!, a.arg!, a.by); toast.success(`Asked ${a.arg} for an update`, { description: hire }); return
     case 'reassign': {

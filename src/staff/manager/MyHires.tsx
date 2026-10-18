@@ -146,9 +146,9 @@ function RampCard({ v }: { v: HireView }) {
       <Eyebrow>First 90 days <ReqTag ids="T10" /></Eyebrow>
       <div className="space-y-1.5">
         {ramp.map((s) => (
-          <div key={s.key} className="flex items-center gap-2 text-xs">
+          <div key={s.key} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
             <Glyph state={s.state === 'open' ? 'prog' : s.state} size={12} />
-            <span className={cn('flex-1 truncate', s.state === 'blank' ? 'text-muted' : 'font-medium')}>{s.name}</span>
+            <span className={cn('min-w-[9rem] flex-1', s.state === 'blank' ? 'text-muted' : 'font-medium')}>{s.name}</span>
             <span className="shrink-0 text-muted">{s.state === 'verified' ? fmtShort(s.ver!) : s.label.replace('Due ', 'by ')}</span>
             <StepActions view={v} step={s} />
           </div>

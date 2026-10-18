@@ -1,5 +1,6 @@
 import type { TeamId } from '../data/people'
 import type { HireView, Ref, StepView } from './derive'
+import { fmtShort } from '../lib/dates'
 
 export interface QueueItem {
   view: HireView
@@ -33,7 +34,7 @@ export function queueFor(views: Record<string, HireView>, who: { team?: TeamId; 
       const holderMatch = matches(s.holder, who)
       if (holderMatch && s.state !== 'blank') {
         q.move.push({ view: v, step: s })
-      } else if (viaTeam(s.holder, who) && s.state !== 'blank' && v.status !== 'withdrawn') {
+      } else if (viaTeam(s.holder, who) && s.state !== 'blank' && !(s.state === 'confirming' && !s.red) && v.status !== 'withdrawn') {
         q.vendor.push({ view: v, step: s })
       } else if (ownerMatch && s.state === 'confirming') {
         q.confirming.push({ view: v, step: s })
@@ -69,3 +70,20 @@ export function countMoves(views: Record<string, HireView>, who: { team?: TeamId
   }
   return { total, red }
 }
+
+/** What the person doing the step needs to know, without opening anything. No home addresses: the vendor has those. */
+export function factsFor(v: HireView, s: StepView, model?: string): string | null {
+  const h = v.hire
+  const [first, last] = v.person.name.toLowerCase().split(' ')
+  switch (s.key) {
+    case 'cancel_laptop': return `Offer withdrawn${h.withdrawn != null ? ` ${fmtShort(h.withdrawn)}` : ''} · stop the ${model ?? h.laptop.model} order`
+    case 'laptop_release': case 'laptop_prep': case 'laptop_ship':
+      return `${model ?? h.laptop.model} · ${h.location} · needed by ${fmtShort(h.start - 2)}`
+    case 'laptop_deliver': return `${h.location} · needed by ${fmtShort(h.start - 2)}`
+    case 'account': return `${first}.${last ?? ''}@northbeam.com${h.rehire ? ' · restore the old account' : ''} · by ${fmtShort(h.start - 1)}`
+    case 'badge': return `${h.location} · first day ${fmtShort(h.start)}`
+    case 'wd_hire': return `${h.title} · starts ${fmtShort(h.start)}`
+    default: return null
+  }
+}
+
