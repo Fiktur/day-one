@@ -46,7 +46,7 @@ export function CommandPalette() {
   const [q, setQ] = useState('')
   const close = () => { set({ palette: false }); setQ('') }
   const become = (id: string) => { set({ split: false, main: { viewer: id, route: defaultRoute(id) } }); close() }
-  const openHire = (id: string) => { set({ split: false, main: { viewer: 'maria', route: { name: 'hire', hireId: id } } }); close() }
+  const openHire = (id: string) => { set({ split: false, main: { viewer: stepViewer, route: { name: 'hire', hireId: id } } }); close() }
   const item = 'flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-[13px]'
   // Steps are searched as the person on screen; the presenter (or a hire) searches as the onboarding team.
   const onScreen = people[main.viewer]
@@ -102,7 +102,7 @@ export function CommandPalette() {
                 </Command.Group>
               )}
               <Command.Group heading="Open a hire record">
-                {Object.values(views).map((v) => (
+                {Object.values(views).filter(seesHire).map((v) => (
                   <Command.Item key={v.hire.id} value={`hire ${v.person.name} ${v.hire.title}`} onSelect={() => openHire(v.hire.id)} className={item}>
                     <Avatar id={v.hire.id} size={22} />{v.person.name}<span className="ml-auto text-xs text-faint">{v.hire.title}</span>
                   </Command.Item>

@@ -15,7 +15,7 @@ import { Emoji, STEP_EMOJI, type EmojiName } from '../ui/assets'
 import { HoldButton } from '../ui/hold'
 import { AnimatePresence, Num, Tilt, motion, springs } from '../ui/motion'
 import { useCelebrate } from '../ui/fx'
-import { buddyOf, confirmBy, handledFor, hireTaskLabel, isOwnActionable, usePlan, type HandledItem } from './helpers'
+import { buddyOf, confirmBy, handledFor, heldBack, hireTaskLabel, isOwnActionable, usePlan, type HandledItem } from './helpers'
 import { systemNames } from '../data/journey'
 
 const HANDLED_EMOJI: Record<string, EmojiName> = { bg: 'shield', permit: 'globe', laptop: 'laptop', account: 'key', seat: 'calendar' }
@@ -33,7 +33,7 @@ export function HireHome({ wide }: { wide?: boolean }) {
   if (!v) return null
   const h = v.hire
   const first = v.person.name.split(' ')[0]
-  const blocked = now >= h.start && v.status === 'atrisk'
+  const blocked = heldBack(v, now)
   const started = now >= h.start && !blocked
   const days = Math.max(0, h.start - now)
   const own = v.hireTasks.filter((s) => s.def.stage <= 4)
@@ -389,7 +389,7 @@ function StartedHome() {
   const week = Math.floor((now - v.hire.start) / 7) + 1
   // What's next comes first; finished milestones follow in order.
   const ramp = v.steps.filter((s) => s.def.stage >= 5 && s.def.owner.type !== 'team').sort((a, b) => Number(a.state === 'verified') - Number(b.state === 'verified'))
-  const doneRamp = ramp.filter((s) => s.state === 'verified').length
+  const doneRamp = ramp.filter((s) => s.state === 'verified' && !(now === v.hire.start && s.done === now)).length
   return (
     <div className="space-y-3.5 px-4 pb-4">
       <div className="pt-1">

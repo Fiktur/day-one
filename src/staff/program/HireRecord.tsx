@@ -151,6 +151,7 @@ function BallBanner({ v, pick }: { v: HireView; pick: (s: StepView) => boolean }
   const pool = v.balls.filter(pick)
   const red = pool.find((b) => b.red)
   const p = red ?? pool[0]
+  const away = p && !p.ownerAway ? pool.find((b) => b.ownerAway && b.red) : undefined
   if (v.status === 'withdrawn') {
     return <div className="mb-4 rounded-xl border border-line bg-sunken px-4 py-3 text-[13px]"><span className="font-semibold">{v.person.name.split(' ')[0]} withdrew on {fmtDay(v.hire.withdrawn!)}.</span> Scheduled messages stopped. Open steps closed. Cancellations went to their owners.</div>
   }
@@ -165,6 +166,8 @@ function BallBanner({ v, pick }: { v: HireView; pick: (s: StepView) => boolean }
         <span className="text-[13px]"><span className="font-semibold">Waiting on {p.holder ? refName(p.holder) : 'the owner'}{p.heldSince != null && p.heldSince < now ? ` for ${now - p.heldSince} day${now - p.heldSince > 1 ? 's' : ''}` : ''}.</span> {safeName(p, { role: person.role, team: person.team }, { action: true })}: {p.ownerAway ? 'owner is out of office, ' : ''}{lc(p.label)}.</span>
         {p.holder && <BallChip step={p} now={now} />}
         <FixButton v={v} s={p} />
+        {/* An owner who is out is a second, separate problem: offer the hand-over too. */}
+        {away && <FixButton v={v} s={away} variant="secondary" />}
       </div>
       <div className={cn('mt-1 text-xs', v.risk ? 'font-medium text-red' : 'text-muted')}>{forecast} <ReqTag ids="X2 O7" /></div>
       {fixes.length > 0 && (
@@ -179,7 +182,7 @@ function BallBanner({ v, pick }: { v: HireView; pick: (s: StepView) => boolean }
 
 function Evidence({ v, s, viewer }: { v: HireView; s: StepView; viewer: { role: string; team?: TeamId } }) {
   const hidden = stepIsSensitiveFor(s.def, viewer)
-  const name = safeName(s, viewer)
+  const name = safeName(s, viewer, { action: true })
   const unlocks = STEPS.filter((d) => d.deps?.includes(s.key)).map((d) => v.by[d.key]).filter(Boolean).map((d) => safeName(d!, viewer))
   const deps = (s.def.deps ?? []).map((d) => v.by[d]).filter(Boolean).map((d) => safeName(d!, viewer))
   const rows: [string, string][] = [

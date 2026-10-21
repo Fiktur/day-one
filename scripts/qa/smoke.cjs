@@ -165,7 +165,7 @@ const check = (ok, msg) => { if (!ok) failures.push(msg); console.log(`${ok ? 'o
   await page.evaluate(async () => (await import('/src/engine/scenarios.ts')).runScenario(3))
   await page.waitForTimeout(1500)
   const lane = await show('shuri', { name: 'queue' })
-  check(/Waiting on your vendor/.test(lane) && /Chase Firstbase/.test(lane), "IT's queue shows Hal's backorder in the vendor lane with Chase")
+  check(/Your move/.test(lane) && /Chase Firstbase/.test(lane), "IT's queue shows Hal's late vendor step as its move, with Chase")
 
   await reset()
   await page.evaluate(async () => (await import('/src/engine/scenarios.ts')).runScenario(5))

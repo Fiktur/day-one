@@ -66,8 +66,8 @@ function Reveal({ reply, onAction, done }: { reply: AssistantReply; onAction: (l
           )}
           {reply.actions && reply.actions.length > 0 && (
             <div className="flex flex-wrap gap-2 pt-1">
-              {reply.actions.map((a) => (
-                <Button key={a.label} size="xs" variant={done.includes(a.label) ? 'quiet' : 'primary'} disabled={done.includes(a.label)} onClick={() => onAction(a.label, a.run())}>
+              {reply.actions.map((a, i) => (
+                <Button key={a.label} size="xs" variant={done.includes(a.label) ? 'quiet' : i === 0 ? 'primary' : 'secondary'} disabled={done.includes(a.label)} onClick={() => onAction(a.label, a.run())}>
                   {done.includes(a.label) ? <><Check className="h-3 w-3" />Done</> : a.label}
                 </Button>
               ))}

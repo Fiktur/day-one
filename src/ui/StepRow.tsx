@@ -93,8 +93,8 @@ export function StepActions({ view, step, compact }: { view: HireView; step: Ste
   const { viewer, person } = useNav()
   const confirm = useDemo((s) => s.confirmStep)
   const markNA = useDemo((s) => s.markNA)
-  // With manual updates, the team that runs a vendor records the vendor's steps itself.
-  const mine = isMine(step, viewer) || (step.mode === 'manual' && step.holder?.kind === 'provider' && step.holder.steward === person.team)
+  // Without a live connection, the team that runs a vendor records the vendor's steps itself.
+  const mine = isMine(step, viewer) || (step.mode !== 'connected' && step.holder?.kind === 'provider' && step.holder.steward === person.team)
   const name = useStepName(step)
   if (!mine) return null
   const actionable = step.state === 'open' || step.state === 'soon' || step.state === 'late'
@@ -143,7 +143,7 @@ export function StepRow({ view, step, showHire, showHolder = true, showSource = 
   const mine = isMine(step, viewer)
   const coord = isCoordinator(viewer)
   const ds = displayState(step, mine, coord)
-  const name = useStepName(step, { action: mine })
+  const name = useStepName(step, { action: true })
   const tint = ds === 'open' ? 'bg-amber-soft/70' : ds === 'late' || ds === 'soon' || (step.red && ds !== 'prog') ? 'bg-red-soft/70' : ''
   return (
     <div className={cn('group grid grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 rounded-lg px-2.5', dense ? 'py-1.5' : 'py-2', tint, flash && 'animate-flash', className)}>

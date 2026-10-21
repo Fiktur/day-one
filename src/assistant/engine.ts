@@ -12,6 +12,7 @@ import { messagesFor } from '../engine/messages'
 import { checkDates, hypothetical } from '../engine/startcheck'
 import { buddyOf, waitingOn } from '../hire/helpers'
 import { suggestedFixes } from '../staff/program/fixes'
+import { areaSummary } from '../staff/shared/summaries'
 import { clockTime, entry } from '../engine/log'
 
 export interface AssistantAction {
@@ -103,9 +104,9 @@ function hireReply(viewer: string, q: string): AssistantReply {
     const shipped = v.by.laptop_ship?.state === 'verified'
     return {
       text: shipped ? 'Your laptop has shipped, but you can still change the address. Put the new one in the form and IT will reroute it.' : "Your laptop hasn't shipped yet, so a new address is easy. Put it in the form on your laptop page.",
-      bullets: ['It goes straight to Workday, where your address already lives.', 'Firstbase reads it from Workday. Day One deletes its copy as soon as Workday confirms.'],
+      bullets: ['It goes straight to Workday, where your address already lives.', 'Your laptop order reads it from Workday. Day One deletes its copy as soon as Workday confirms.'],
       actions: [{ label: 'Open the address form', run: () => { openFor(viewer, { name: 'laptop', step: 'address' }) } }],
-      sources: ['Firstbase · laptop order', 'Workday · your address'],
+      sources: ['Your laptop order', 'Workday · your address'],
     }
   }
 
@@ -204,7 +205,7 @@ function managerReply(viewer: string, q: string): AssistantReply {
     return {
       text: v.status === 'unknown' ? `${first(v.hire.id)}'s status for ${fmtDay(v.hire.start)} is unclear: a system can't be checked right now.` : `${first(v.hire.id)} is ${lc(STATUS_LABEL[v.status])} for ${fmtDay(v.hire.start)}.`,
       bullets: [
-        ...v.areas.map((a) => `${a.label}: ${a.state === 'green' ? 'done' : a.state === 'red' ? 'needs attention' : a.state === 'unknown' ? "can't check right now" : `${a.done} of ${a.total} done`}`),
+        ...v.areas.map((a) => `${a.label}: ${a.state === 'green' ? 'done' : lc(areaSummary(v, a, now))}`),
         ...(p?.holder ? [`Right now: waiting on ${refName(p.holder)} (${lc(safeName(p, { role: 'manager' }))}, ${lc(p.label)})`] : []),
       ],
       sources: ['Day One · readiness'],
@@ -244,7 +245,7 @@ function programReply(viewer: string, q: string): AssistantReply {
         ...(fixes.length ? ['Options: an in-stock model ships in 1–2 days; local pickup in San Diego; or move the start a week.'] : []),
       ],
       actions: fixes,
-      sources: ['Hire record · steps and forecast', 'Firstbase · order status'],
+      sources: ['Hire record · steps and forecast', ...(p.holder?.kind === 'provider' ? [`${p.holder.name} · status`] : [])],
       note: 'I can suggest changes. A date change needs your confirmation and the manager’s approval.',
     }
   }

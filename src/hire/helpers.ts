@@ -28,10 +28,16 @@ export function waitingOn(v: HireView, key: string): string | null {
   return null
 }
 
-/** When the onboarding team promises to confirm a shaky start date. Fixed dates, so the promise doesn't slide day by day. */
+/** When the onboarding team promises to confirm a shaky start date: a week before, then the last working day, then two working days after. Fixed, so it doesn't slide; once all have passed, it's today. */
 export function confirmBy(start: number, now: number): number {
   const weekBefore = prevWeekday(start - 7)
-  return now <= weekBefore ? weekBefore : now < start ? prevWeekday(start - 1) : addBiz(start, 2)
+  const lastDay = prevWeekday(start - 1)
+  return Math.max(now, now <= weekBefore ? weekBefore : now <= lastDay ? lastDay : addBiz(start, 2))
+}
+
+/** Past the last working day before the start with the date still at risk: the hire is told not to come in. */
+export function heldBack(v: HireView, now: number): boolean {
+  return v.status === 'atrisk' && now > prevWeekday(v.hire.start - 1)
 }
 
 /** Company-side work, in the hire's words. Never red: delays read "taking longer than usual". */

@@ -108,10 +108,10 @@ function HireCard({ v }: { v: HireView }) {
       <div className="text-[13px] tnum">{startLine(v, now)}{v.dateMoved && <span className="text-muted"> · moved from {fmtShort(v.hire.originalStart)}</span>}</div>
       <ReadinessBar areas={v.areas} mineArea={myMoves.some((s) => s.def.area === 'prep') ? 'prep' : null} />
       {ball && ball.holder && (
-        <div className="flex min-w-0 items-center gap-2 text-xs text-muted">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
           <span className="shrink-0">Waiting on</span>
           <BallChip step={ball} now={now} size="sm" />
-          <span className="truncate">{safeName(ball, { role: person.role, team: person.team }, { action: true })}</span>
+          <span>{safeName(ball, { role: person.role, team: person.team }, { action: true })}</span>
         </div>
       )}
       {myMoves.length > 0 && (

@@ -158,7 +158,7 @@ function Notifications() {
     ...(p.role === 'manager' ? Object.values(views).filter((v) => managerFor(v.hire, ctx).id === viewer || v.hire.managerId === viewer).flatMap((v) =>
       v.status === 'withdrawn' ? [{ key: `w:${v.hire.id}`, hireId: v.hire.id, text: `${v.person.name} withdrew. Nothing needed from you.` }]
         : v.status === 'atrisk' && v.primary?.holder && !(v.primary.holder.kind === 'person' && v.primary.holder.id === viewer) ? [{ key: `r:${v.hire.id}`, hireId: v.hire.id, text: `${v.person.name}'s start date is at risk. Maria Hill is on it.` }] : []) : []),
-    ...q.vendor.filter((x) => !x.step.red).slice(0, 3).map((x) => ({ key: `v:${x.view.hire.id}:${x.step.key}`, hireId: x.view.hire.id, text: `${x.view.person.name.split(' ')[0]} · ${safeName(x.step, { role: p.role, team: p.team })}: with ${x.step.holder?.name}, ${lc(x.step.label)}` })),
+    ...q.vendor.filter((x) => !x.step.red).slice(0, 3).map((x) => ({ key: `v:${x.view.hire.id}:${x.step.key}`, hireId: x.view.hire.id, text: `${x.view.person.name.split(' ')[0]} · ${safeName(x.step, { role: p.role, team: p.team }, { action: true })}: with ${x.step.holder?.name}, ${lc(x.step.label)}` })),
   ]
   const groups = Array.from(new Set(todo.map((x) => x.view.hire.id))).map((id) => ({ v: views[id], items: todo.filter((x) => x.view.hire.id === id) }))
   const red = todo.filter((x) => x.step.red).length

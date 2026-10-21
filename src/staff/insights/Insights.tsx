@@ -116,7 +116,8 @@ export function Insights() {
         <Card className="p-4">
           <h2 className="flex items-center gap-2 font-semibold"><Lightbulb className="h-4 w-4 text-accent" />Make it easier to run</h2>
           <div className="mt-3 space-y-3">
-            {SUGGESTIONS.map((x, i) => {
+            {/* A suggestion the chart's own button already settled (the Nov 16 session) drops off the list. */}
+            {SUGGESTIONS.filter((x) => !(x.title.includes('orientation session') && extra.includes(42))).map((x, i) => {
               const done = assignments.find((a) => a.title === x.title)
               return (
                 <div key={x.title} className="rounded-lg bg-bg p-3">

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Check, ExternalLink, KeyRound, Laptop, Lock, Mail, MapPin, Package, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '../lib/cn'
@@ -16,7 +16,7 @@ import { burst } from '../ui/fx'
 import { Emoji, type EmojiName } from '../ui/assets'
 import { motion, springs } from '../ui/motion'
 import { ShipTracker } from './Home'
-import { buddyOf, confirmBy, usePlan } from './helpers'
+import { buddyOf, confirmBy, heldBack, usePlan } from './helpers'
 
 export function FirstWeek() {
   const { viewer } = useNav()
@@ -28,7 +28,7 @@ export function FirstWeek() {
   const planReady = v.by.first_week?.state === 'verified'
   const { plan } = usePlan(v)
   const days = plan.map((items, i) => ({ d: h.start + i, items: items.map((x) => [x.t, x.l]) }))
-  if (now >= h.start && v.status === 'atrisk') {
+  if (heldBack(v, now)) {
     return <div className="px-4 pb-6"><div className="rounded-2xl bg-sunken px-3.5 py-3 text-[13px] text-muted">Your first week moves with your new start date. {people.maria.name.split(' ')[0]} will share it once the date is confirmed, by {fmtDay(confirmBy(h.start, now))}.</div></div>
   }
   return (
@@ -53,7 +53,7 @@ export function FirstWeek() {
           </li>
         ))}
       </ol>
-      <p className="px-1 text-xs text-muted">{h.mode === 'remote' ? 'You’re starting remotely. Your laptop arrives set up; on day one you just sign in.' : `You’re starting at the ${h.location}. Pick up your badge at the front desk at 8:45.`}</p>
+      <p className="px-1 text-xs text-muted">{h.mode !== 'remote' ? `You’re starting at the ${h.location}. Pick up your badge at the front desk at 8:45.` : (v.by.laptop_deliver?.ver ?? 0) >= h.start && v.by.laptop_deliver?.state !== 'verified' ? `You’re starting remotely. Your laptop lands after your start date, so ${people.maria.name.split(' ')[0]} will tell you the plan for day one.` : 'You’re starting remotely. Your laptop arrives set up; on day one you just sign in.'}</p>
       {now >= h.start - 7 && <p className="px-1 text-xs text-faint">Updated {rel(now, now)}.</p>}
     </div>
   )
@@ -281,15 +281,17 @@ export function LaptopPage() {
 
 /** The new address goes straight to Workday, the system of record. Day One deletes its copy once Workday confirms. */
 function AddressChange({ v, address }: { v: HireView; address: string }) {
-  const { route } = useNav()
+  const { route, go } = useNav()
   const changeAddress = useDemo((s) => s.changeAddress)
   const [open, setOpen] = useState(route.step === 'address')
+  // Opened from chat: take the flag off the route so the next hire on this page doesn't start with the form open.
+  useEffect(() => { if (route.step === 'address') go({ name: 'laptop' }) }, [route.step, go])
   const [draft, setDraft] = useState('')
   const shipped = v.by.laptop_ship?.state === 'verified'
   if (!open) return <Button variant="secondary" size="md" className="w-full" onClick={() => setOpen(true)}><MapPin className="h-4 w-4" />Change the delivery address</Button>
   const send = () => {
     changeAddress(v.hire.id, draft.trim(), shipped)
-    toast.success('Address updated in Workday', { description: shipped ? 'Your laptop already shipped, so IT will reroute it. Day One kept no copy.' : 'Firstbase reads it from there. Day One kept no copy.' })
+    toast.success('Address updated in Workday', { description: shipped ? 'Your laptop already shipped, so IT will reroute it. Day One kept no copy.' : 'Your laptop order picks it up from there. Day One kept no copy.' })
     setOpen(false)
     setDraft('')
   }

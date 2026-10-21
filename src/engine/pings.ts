@@ -89,8 +89,9 @@ export function pingsFor(views: Record<string, HireView>, st: PingState, ctx: De
       const why = p.holder ? `Waiting on ${refName(p.holder)}: ${lc(p.label)}.` : `${p.label}.`
       if (!m.away) add({ to: mgr, toLabel: first(mgr), channel: 'Slack', kind: 'fyi', hireId: h.id, key: 'risk', title: `${hireFirst}'s start date is at risk`, body: `${why} Maria Hill is on it.`, actions: [{ kind: 'open', label: 'Open', by: mgr }] })
       add({ to: h.recruiterId, toLabel: first(h.recruiterId), channel: 'Slack', kind: 'fyi', hireId: h.id, key: 'risk', title: `${hireFirst}'s start date is at risk`, body: 'Hold off on promising the date until Maria confirms it.', actions: [{ kind: 'open', label: 'Open', by: h.recruiterId }] })
-      // A vendor that already gave a new date has answered: the move is a decision, not a chase.
-      const chase = p.holder?.kind === 'provider' && p.eta == null
+      // Same rule as the Command row (fixFor): chase the vendor unless there's a decision to make instead.
+      // shortcut: the only scripted decision is Hal's backorder (suggestedFixes); move both to one shared rule if more are added.
+      const chase = p.holder?.kind === 'provider' && !(h.id === 'hal' && p.key === 'laptop_prep')
       add({ to: 'maria', toLabel: 'Maria', channel: 'Slack', kind: 'todo', hireId: h.id, key: p.key, title: `${hireFirst}'s start date is at risk`, body: `${task(p, 'program')}. ${p.label}.`, actions: chase ? [{ kind: 'chase', label: `Chase ${p.holder!.name}`, by: 'maria', arg: p.holder!.name }, { kind: 'open', label: 'Open', by: 'maria' }] : [{ kind: 'open', label: p.holder?.kind === 'provider' ? 'Choose a fix' : 'Open', by: 'maria' }] })
     }
     // An owner away with nobody covering: the onboarding team can hand it over in one tap.
