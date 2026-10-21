@@ -84,14 +84,17 @@ export function HireRecord() {
             // After a withdrawal, closed steps are stopped, not done.
             const stopped = v.status === 'withdrawn'
             const done = steps.filter((s) => s.state === 'verified' || (!stopped && s.state === 'na')).length
-            const folded = !stopped && done === steps.length && !openStages.includes(i)
+            // Finished steps fold away until asked for, so the record leads with what's still open.
+            const isDone = (s: StepView) => s.state === 'verified' || s.state === 'na'
+            const list = stopped || openStages.includes(i) ? steps : steps.filter((s) => !isDone(s) || s.key === selected?.key)
+            const hidden = steps.length - list.length
             return (
             <div key={i} className="mt-1">
               <button type="button" onClick={() => setOpenStages((x) => (x.includes(i) ? x.filter((y) => y !== i) : [...x, i]))} className="flex w-full items-center justify-between rounded-md px-2.5 pb-1 pt-2 text-left hover:bg-bg">
-                <span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-faint">{done === steps.length && <Glyph state="verified" size={11} />}{STAGES[i]}{folded && <span className="normal-case tracking-normal">· all done, tap to show</span>}</span>
+                <span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-faint">{done === steps.length && <Glyph state="verified" size={11} />}{STAGES[i]}{hidden > 0 && <span className="normal-case tracking-normal">· {done === steps.length ? 'all done' : `${hidden} done`}, tap to show</span>}</span>
                 <span className="text-[10px] text-faint">{done}/{steps.length}</span>
               </button>
-              {!folded && steps.map((s) => (
+              {list.map((s) => (
                 <StepRow key={s.key} view={v} step={s} onOpen={() => { setSel(s.key); setTab('evidence') }} className={cn(selected?.key === s.key && 'ring-1 ring-accent/50')} />
               ))}
             </div>

@@ -8,7 +8,7 @@ import { useDemo } from '../engine/store'
 import { people } from '../data/people'
 import { PEPPER_VIDEO } from '../data/welcome'
 import { fmtDay, fmtWeekdayShort, rel } from '../lib/dates'
-import { managerFor } from '../engine/derive'
+import { managerFor, type HireView } from '../engine/derive'
 import { ctxOf } from '../engine/selectors'
 import { Avatar, Button, Glyph, ReqTag } from '../ui/parts'
 import { VideoPlayer } from '../ui/video'
@@ -200,7 +200,7 @@ export function DetailsPage() {
           </label>
         ))}
       </div>
-      <p className="flex items-start gap-1.5 text-xs text-muted"><MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />We delete your delivery address 30 days after your laptop arrives. Tax and bank details go straight into Workday, never Day One.</p>
+      <p className="flex items-start gap-1.5 text-xs text-muted"><MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />Your address and your tax and bank details live in Workday. Day One passes changes straight through and keeps no copy.</p>
       <Button variant="primary" size="md" className="w-full" onClick={(e) => { burst('small', e.currentTarget); if (step && step.state !== 'verified') markDone(viewer, 'details', viewer); toast.success('Details confirmed', { description: 'Sent to Workday and Firstbase. You won’t be asked again.' }); go({ name: 'tasks' }) }}>
         {step?.state === 'verified' ? 'Save changes' : 'Confirm details'}
       </Button>
@@ -243,7 +243,7 @@ export function LaptopPage() {
             ))}
           </div>
           <div className="rounded-2xl border border-line bg-surface p-3 text-[13px] shadow-card"><div className="text-xs text-muted">Deliver to</div><div className="font-medium">{address}</div></div>
-          <Button variant="primary" size="md" className="w-full" onClick={(e) => { burst('small', e.currentTarget); set({ laptopModel: { ...laptopModel, [viewer]: pick } }); markDone(viewer, 'laptop_choice', viewer); toast.success(`${pick} chosen`, { description: 'It ships after your background check.' }) }}>Choose {pick}</Button>
+          <Button variant="primary" size="md" className="w-full" onClick={(e) => { burst('small', e.currentTarget); set({ laptopModel: { ...laptopModel, [viewer]: pick } }); markDone(viewer, 'laptop_choice', viewer); toast.success(`${pick} chosen`, { description: "We'll tell you when it ships." }) }}>Choose {pick}</Button>
         </>
       ) : (
         <>
@@ -272,9 +272,36 @@ export function LaptopPage() {
           <p className="flex items-start gap-2 px-1 text-xs text-muted"><Emoji name="key" size={18} className="shrink-0" />{arrives != null && arrives >= v.hire.start
             ? `Taking longer than usual: expected ${fmtDay(arrives)}, after your start date. ${people.maria.name.split(' ')[0]} will tell you the plan for day one by ${fmtDay(confirmBy(v.hire.start, now))}.`
             : `Arrives set up and enrolled. On ${fmtWeekdayShort(v.hire.start)} you just sign in.`}</p>
-          <Button variant="secondary" size="md" className="w-full" onClick={() => go({ name: 'help' })}><MapPin className="h-4 w-4" />Change the delivery address</Button>
+          <AddressChange v={v} address={address} />
         </>
       )}
     </div>
+  )
+}
+
+/** The new address goes straight to Workday, the system of record. Day One deletes its copy once Workday confirms. */
+function AddressChange({ v, address }: { v: HireView; address: string }) {
+  const { route } = useNav()
+  const changeAddress = useDemo((s) => s.changeAddress)
+  const [open, setOpen] = useState(route.step === 'address')
+  const [draft, setDraft] = useState('')
+  const shipped = v.by.laptop_ship?.state === 'verified'
+  if (!open) return <Button variant="secondary" size="md" className="w-full" onClick={() => setOpen(true)}><MapPin className="h-4 w-4" />Change the delivery address</Button>
+  const send = () => {
+    changeAddress(v.hire.id, draft.trim(), shipped)
+    toast.success('Address updated in Workday', { description: shipped ? 'Your laptop already shipped, so IT will reroute it. Day One kept no copy.' : 'Firstbase reads it from there. Day One kept no copy.' })
+    setOpen(false)
+    setDraft('')
+  }
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); if (draft.trim()) send() }} className="space-y-2 rounded-[22px] border border-line bg-surface p-3.5 shadow-card">
+      <label className="block text-[13px] font-semibold" htmlFor="new-address">New delivery address</label>
+      <input id="new-address" autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={address} autoComplete="street-address" className="w-full rounded-xl border border-line bg-bg px-3 py-2 text-[14px] outline-none focus:border-accent" />
+      <p className="flex items-start gap-1.5 text-xs text-muted"><Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />Goes straight to Workday, where your address already lives. Day One deletes its copy as soon as Workday confirms.{shipped ? ' Your laptop has shipped, so IT will reroute it.' : ''}</p>
+      <div className="flex gap-2">
+        <Button type="submit" variant="primary" size="md" className="flex-1" disabled={!draft.trim()}>Send to Workday</Button>
+        <Button type="button" size="md" onClick={() => { setOpen(false); setDraft('') }}>Cancel</Button>
+      </div>
+    </form>
   )
 }

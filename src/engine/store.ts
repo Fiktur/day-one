@@ -67,6 +67,7 @@ interface Data {
   hires: Record<string, HireMut>
   ooo: Record<string, { until: number; delegate: string | null; since?: number }>
   laptopModel: Record<string, string>
+  /** Stands in for Workday, the system of record: Day One reads delivery addresses from there and keeps none of its own. */
   addresses: Record<string, string>
   boards: Record<string, Board>
   templates: Record<string, BoardTemplate>
@@ -126,6 +127,7 @@ interface Actions {
   addLog: (...e: LogEntry[]) => void
   flash: (...keys: string[]) => void
   addRequest: (hireId: string, text: string, to: string) => void
+  changeAddress: (hireId: string, address: string, shipped: boolean) => void
   assignBuddy: (hireId: string, buddyId: string, by: string) => void
   savePlan: (hireId: string, plan: PlanDay[], by: string) => void
   setFirstWork: (hireId: string, work: { title: string; link: string }, by: string) => void
@@ -334,6 +336,17 @@ export const useDemo = create<DemoState>()((set, get) => ({
   addRequest: (hireId, text, to) => {
     const s = get()
     set({ requests: [{ id: `r${s.requests.length + 1}`, hireId, text, day: s.now, to }, ...s.requests] })
+  },
+
+  changeAddress: (hireId, address, shipped) => {
+    const s = get()
+    // Day One holds the new address only in transit: Workday stores it, Firstbase reads it from there, and Day One's copy goes once Workday confirms.
+    set({ addresses: { ...s.addresses, [hireId]: address } })
+    get().addLog(
+      entry(s.now, hhmm(), 'workday', 'address.updated', `${nameOf(hireId)} · delivery address changed by the hire`, 'ok', nameOf(hireId)),
+      entry(s.now, hhmm(), 'day one', 'address.deleted', `${nameOf(hireId)} · Workday confirmed, so Day One deleted its copy`, 'info', nameOf(hireId)),
+    )
+    if (shipped) get().addRequest(hireId, 'Reroute the shipped laptop: the new address is in Workday', 'felicity')
   },
 
   assignBuddy: (hireId, buddyId, by) => {

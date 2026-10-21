@@ -112,9 +112,10 @@ export function ManagerHire() {
                     </div>
                     {m.edited && <span className="rounded bg-accent-soft px-1.5 py-0.5 text-[10px] font-semibold text-accent">Edited</span>}
                   </div>
-                  {m.editableUntil != null && m.status === 'scheduled' && (
+                  {/* Anything still to send in the manager's name can be edited, until its edit window closes. */}
+                  {m.template.from === 'manager' && (m.status === 'scheduled' || m.status === 'waiting') && (m.editableUntil == null || now <= m.editableUntil) && (
                     <>
-                      <p className="mt-1.5 text-xs text-muted">{m.edited ? 'Your version will send.' : 'The default sends unless you edit it'} · edits close {fmtDay(m.editableUntil)}</p>
+                      <p className="mt-1.5 text-xs text-muted">{m.edited ? 'Your version will send.' : 'The default sends unless you edit it'}{m.editableUntil != null ? ` · edits close ${fmtDay(m.editableUntil)}` : ''}</p>
                       <div className="mt-2 flex gap-2">
                         <Button size="xs" onClick={() => setEditing(m.key)}><Eye className="h-3 w-3" />Preview</Button>
                         <Button size="xs" onClick={() => setEditing(m.key)}><Pencil className="h-3 w-3" />Edit</Button>

@@ -257,6 +257,18 @@ const check = (ok, msg) => { if (!ok) failures.push(msg); console.log(`${ok ? 'o
   const jen = await show('jennifer', { name: 'hire', hireId: 'virgil' })
   check(!/Messages/.test(jen.split('What’s next')[1] ?? '') && !/Activity/.test(jen.split('What’s next')[1] ?? ''), 'Background screening sees no messages or activity on a hire record')
 
+  // ---- Address changes go through Workday; Day One keeps no copy and the chat never invents one ----
+  await reset()
+  const chat = await page.evaluate(async () => { const r = (await import('/src/assistant/engine.ts')).respond('virgil', 'Change my laptop delivery address'); return { text: r.text, addr: window.__demo.getState().addresses.virgil ?? null } })
+  check(chat.addr === null && /form/.test(chat.text), `the assistant points to the address form instead of changing it ("${chat.text.slice(0, 50)}")`)
+  await page.evaluate(() => window.__demo.getState().setNow(16))
+  await show('virgil', { name: 'laptop', step: 'address' })
+  await page.locator('#new-address').fill('500 W Madison St, Chicago, IL')
+  await page.getByRole('button', { name: 'Send to Workday' }).click()
+  await page.waitForTimeout(400)
+  const addr = await page.evaluate(() => { const s = window.__demo.getState(); return { a: s.addresses.virgil, log: s.log.slice(0, 4).map((l) => `${l.system}:${l.event}`) } })
+  check(addr.a === '500 W Madison St, Chicago, IL' && addr.log.includes('workday:address.updated') && addr.log.includes('day one:address.deleted'), `address goes to Workday and Day One deletes its copy (${addr.log.join(', ')})`)
+
   // ---- All eight scenarios run without console errors ----
   await reset()
   for (const n of [1, 2, 3, 4, 5, 6, 7, 8]) {

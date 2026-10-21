@@ -387,7 +387,8 @@ function StartedHome() {
   const v = useView(viewer)!
   const now = useDemo((s) => s.now)
   const week = Math.floor((now - v.hire.start) / 7) + 1
-  const ramp = v.steps.filter((s) => s.def.stage >= 5 && s.def.owner.type !== 'team')
+  // What's next comes first; finished milestones follow in order.
+  const ramp = v.steps.filter((s) => s.def.stage >= 5 && s.def.owner.type !== 'team').sort((a, b) => Number(a.state === 'verified') - Number(b.state === 'verified'))
   const doneRamp = ramp.filter((s) => s.state === 'verified').length
   return (
     <div className="space-y-3.5 px-4 pb-4">

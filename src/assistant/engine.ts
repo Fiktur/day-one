@@ -4,7 +4,7 @@ import { SESSIONS, PLANNED_STARTS, groupFor, EXTRA_ATTENDEES } from '../data/coh
 import { LEAD_TIMES } from '../data/history'
 import { HIRES } from '../data/hires'
 import { addBiz, fmtDay, fmtLong, fmtShort, fmtWeekdayShort, nextWeekday, rel } from '../lib/dates'
-import { useDemo } from '../engine/store'
+import { useDemo, type Route } from '../engine/store'
 import { selectViews, ctxOf } from '../engine/selectors'
 import { STATUS_LABEL, managerFor, refName, safeName, type HireView } from '../engine/derive'
 import { queueFor } from '../engine/queues'
@@ -29,6 +29,13 @@ export interface AssistantReply {
 }
 
 const S = () => useDemo.getState()
+
+/** Moves whichever pane shows this person to the page, so an assistant action can open the right screen. */
+function openFor(viewer: string, route: Route) {
+  const s = S()
+  if (s.main.viewer === viewer) s.goMain(route)
+  s.panes.forEach((p, i) => { if (p.viewer === viewer) s.setPane(i, { viewer, route }) })
+}
 const first = (id: string) => people[id]?.name.split(' ')[0] ?? id
 const hhmm = () => clockTime()
 
@@ -92,35 +99,16 @@ function hireReply(viewer: string, q: string): AssistantReply {
   const buddy = buddyOf(v)
 
   if (/(change|update|different|new).*(address|deliver)|deliver.*(somewhere|elsewhere|address)/.test(t)) {
+    // Never take an address in chat: it goes through the form, straight into Workday.
     const shipped = v.by.laptop_ship?.state === 'verified'
-    if (!shipped) {
-      const newAddr = h.id === 'virgil' ? '1830 W Division St, Chicago, IL' : 'your new address'
-      s.addLog(entry(now, hhmm(), 'firstbase', 'order.updated', `${v.person.name} · delivery address changed by the assistant · confirmed`, 'ok', v.person.name))
-      s.set({ addresses: { ...s.addresses, [h.id]: newAddr } })
-      return {
-        text: "Yes. Your laptop hasn't shipped yet, so I changed the address for you.",
-        steps: [
-          { label: 'Checked your laptop order: not shipped yet', ok: true },
-          { label: 'Updated the delivery address in Firstbase', ok: true },
-          { label: `Firstbase confirmed the change at ${clockTime().slice(0, 5)} am`, ok: true },
-        ],
-        bullets: [`New address: ${newAddr}`],
-        sources: ['Firstbase · laptop order', 'Day One · your details'],
-        note: 'Only you and IT can see your delivery address. Day One deletes it 30 days after your laptop arrives.',
-      }
-    }
-    s.addRequest(h.id, 'Change laptop delivery address after shipping', 'felicity')
     return {
-      text: "Your laptop has already shipped, so I can't change the address myself. I've sent IT a change request with everything they need.",
-      steps: [
-        { label: 'Checked your laptop order: already shipped', ok: true },
-        { label: 'Created a request for IT with your order and new address', ok: true },
-        { label: 'Felicity Smoak will reply within one business day', ok: true },
-      ],
-      sources: ['Firstbase · shipment', 'IT service desk'],
-      note: "You'll see the request on your Help tab.",
+      text: shipped ? 'Your laptop has shipped, but you can still change the address. Put the new one in the form and IT will reroute it.' : "Your laptop hasn't shipped yet, so a new address is easy. Put it in the form on your laptop page.",
+      bullets: ['It goes straight to Workday, where your address already lives.', 'Firstbase reads it from Workday. Day One deletes its copy as soon as Workday confirms.'],
+      actions: [{ label: 'Open the address form', run: () => { openFor(viewer, { name: 'laptop', step: 'address' }) } }],
+      sources: ['Firstbase · laptop order', 'Workday · your address'],
     }
   }
+
   if (/left|to do|todo|need to do|what.*(do|finish)/.test(t)) {
     const mine = v.hireTasks.filter((x) => x.state === 'open' || x.state === 'soon' || x.state === 'late')
     const next = v.hireTasks.filter((x) => x.state === 'blank' && x.def.stage <= 4).sort((a, b) => (a.open ?? 99) - (b.open ?? 99))[0]
