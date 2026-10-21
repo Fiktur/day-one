@@ -2,11 +2,14 @@ import { safeName, type AreaView, type HireView } from '../../engine/derive'
 import { lc } from '../../lib/cn'
 import { fmtDay, fmtShort, rel } from '../../lib/dates'
 
+// Steps the area detail below already describes, so they're never repeated as the lead.
+const DESCRIBED = ['consent', 'bg_complete', 'clearance', 'permit', 'laptop_release', 'laptop_prep', 'laptop_ship', 'laptop_deliver', 'laptop_received', 'orient_rsvp']
+
 /** One-line, privacy-safe summary of each readiness area, for managers and recruiters. */
 export function areaSummary(v: HireView, a: AreaView, now: number): string {
   if (v.status === 'withdrawn') return a.done ? `Stopped at ${a.done} of ${a.total} done when the offer was withdrawn.` : 'Stopped when the offer was withdrawn.'
   // A red area leads with the step that made it red, so "Clearance complete" never sits alone on a red card.
-  const red = v.steps.find((s) => s.def.area === a.id && s.red)
+  const red = v.steps.find((s) => s.def.area === a.id && s.red && !DESCRIBED.includes(s.key))
   return `${red ? `${safeName(red, { role: 'manager' }, { action: true })}: ${lc(red.label)}. ` : ''}${areaDetail(v, a, now)}`
 }
 

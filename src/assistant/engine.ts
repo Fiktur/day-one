@@ -177,9 +177,13 @@ function managerReply(viewer: string, q: string): AssistantReply {
   if (/draft|welcome message|write/.test(t)) {
     const v = findHire(q, mineHires[0]?.hire.id) ?? mineHires[0]
     if (!v) return fallback()
-    const draft = `Hi ${first(v.hire.id)}, I'm really glad you're joining us. Your first project is the edge routing rollout, and you'll pair with ${buddyOf(v) ? first(buddyOf(v)!) : 'the team'} on it. Your first week is planned, and I've kept Wednesday afternoon free so we can talk properly. See you ${fmtWeekdayShort(v.hire.start)}. ${first(viewer)}`
+    // Only what's true for this hire: their chosen first piece of work and a plan that really exists.
+    const work = s.firstWork[v.hire.id]?.title
+    const planned = v.by.first_week?.state === 'verified'
+    const pair = buddyOf(v) ? first(buddyOf(v)!) : 'the team'
+    const draft = `Hi ${first(v.hire.id)}, I'm really glad you're joining us. ${work ? `Your first project is ${work}, and you'll pair with ${pair} on it.` : `You'll pair with ${pair} in your first weeks.`} ${planned ? 'Your first week is planned, and' : "I'm putting your first week together now, and"} I've kept Wednesday afternoon free so we can talk properly. See you ${fmtWeekdayShort(v.hire.start)}. ${first(viewer)}`
     return {
-      text: `Here's a draft for ${first(v.hire.id)}. It sends ${fmtDay(v.hire.start - 7)} in your name unless you change it.`,
+      text: `Here's a draft for ${first(v.hire.id)}. It sends ${fmtDay(v.hire.start - 7)} ${v.hire.managerId === viewer ? 'in your name' : `in ${first(v.hire.managerId)}'s name, sent by you`} unless you change it.`,
       bullets: [draft],
       actions: [{ label: 'Use this draft', run: () => { S().editMessage(v.hire.id, 'manager_welcome', draft, viewer); return 'Saved. It will send in your name.' } }],
       sources: ['Your welcome message', `${first(v.hire.id)}'s first-week plan`],
@@ -205,7 +209,7 @@ function managerReply(viewer: string, q: string): AssistantReply {
     return {
       text: v.status === 'unknown' ? `${first(v.hire.id)}'s status for ${fmtDay(v.hire.start)} is unclear: a system can't be checked right now.` : `${first(v.hire.id)} is ${lc(STATUS_LABEL[v.status])} for ${fmtDay(v.hire.start)}.`,
       bullets: [
-        ...v.areas.map((a) => `${a.label}: ${a.state === 'green' ? 'done' : lc(areaSummary(v, a, now))}`),
+        ...v.areas.map((a) => `${a.label}: ${a.state === 'green' ? 'done' : areaSummary(v, a, now)}`),
         ...(p?.holder ? [`Right now: waiting on ${refName(p.holder)} (${lc(safeName(p, { role: 'manager' }))}, ${lc(p.label)})`] : []),
       ],
       sources: ['Day One · readiness'],
