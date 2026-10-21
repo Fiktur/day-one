@@ -37,7 +37,8 @@ function StudioButton({ v, label }: { v: HireView; label: string }) {
 
 /** Suggest the team's usual buddies first: the one already lined up, then buddies from the same manager's other hires. */
 function suggestedBuddies(v: HireView): string[] {
-  const pool = [v.hire.buddyId, ...HIRES.filter((h) => h.managerId === v.hire.managerId).map((h) => h.buddyId), ...HIRES.map((h) => h.buddyId)]
+  // Teammates only: the hire's own suggestion, then buddies already working with this manager or department.
+  const pool = [v.hire.buddyId, ...HIRES.filter((h) => h.managerId === v.hire.managerId || h.dept === v.hire.dept).map((h) => h.buddyId)]
   return Array.from(new Set(pool.filter((x): x is string => !!x))).slice(0, 3)
 }
 

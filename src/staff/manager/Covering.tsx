@@ -8,6 +8,7 @@ import { HIRES } from '../../data/hires'
 import { fmtDay, fmtShort } from '../../lib/dates'
 import { Avatar, Button, Card, Empty, ReqTag } from '../../ui/parts'
 import { StepRow } from '../../ui/StepRow'
+import { prepActionFor } from './PrepActions'
 import { Page, PageHeader } from '../StaffShell'
 import { Select } from '../../ui/overlay'
 
@@ -35,7 +36,7 @@ export function Covering() {
             <div><div className="font-semibold">You're covering for {people[m].name}</div><div className="text-xs text-muted">Until {fmtDay(o.until)}</div></div>
           </div>
           <div className="mt-3">
-            {Object.values(views).filter((v) => v.hire.managerId === m).flatMap((v) => v.steps.filter((s) => s.holder?.id === viewer && s.state !== 'blank').map((s) => <StepRow key={v.hire.id + s.key} view={v} step={s} showHire showSource={false} />))}
+            {Object.values(views).filter((v) => v.hire.managerId === m).flatMap((v) => v.steps.filter((s) => s.holder?.id === viewer && s.state !== 'blank').map((s) => <StepRow key={v.hire.id + s.key} view={v} step={s} showHire showSource={false} actions={prepActionFor(v, s)} />))}
           </div>
         </Card>
       ))}

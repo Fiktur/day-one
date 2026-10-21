@@ -59,6 +59,7 @@ add({ id: 'miles', name: 'Miles Morales', title: 'Software Engineer, Platform', 
 add({ id: 'kitty', name: 'Kitty Pryde', title: 'Senior Product Designer', role: 'manager', hue: 0 })
 add({ id: 'foggy', name: 'Foggy Nelson', title: 'Senior Counsel', role: 'manager', hue: 2 })
 add({ id: 'oliver', name: 'Oliver Queen', title: 'Senior Account Executive', role: 'manager', hue: 3 })
+add({ id: 'jane', name: 'Jane Foster', title: 'Senior Hardware Engineer', role: 'manager', hue: 1 })
 
 export interface Team {
   id: TeamId

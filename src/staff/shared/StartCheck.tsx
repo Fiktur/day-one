@@ -6,10 +6,26 @@ import { useViews, ctxOf, useCtx } from '../../engine/selectors'
 import { managerFor } from '../../engine/derive'
 import { checkDates, hypothetical, type DateCheck } from '../../engine/startcheck'
 import { fmtDay } from '../../lib/dates'
-import { Avatar, Card, Glyph, Pill, ReqTag } from '../../ui/parts'
+import { Avatar, Button, Card, Glyph, Pill, ReqTag } from '../../ui/parts'
+import { toast } from 'sonner'
 import { Page, PageHeader } from '../StaffShell'
 import { Segmented } from '../../ui/motion'
 import { Select } from '../../ui/overlay'
+
+/** The one next move once the safe date is known: a recruiter copies it for the offer, a manager proposes it, Maria changes it. */
+function ProposeDate({ day, hireId }: { day: number; hireId?: string }) {
+  const { person, viewer } = useNav()
+  const st = useDemo()
+  const current = hireId ? st.hires[hireId]?.start : undefined
+  if (hireId && current === day) return null
+  if (person.role === 'program' && hireId) return <Button size="xs" variant="primary" onClick={() => st.setDialog({ type: 'changeDate', hireId, to: day })}>Move start to {fmtDay(day)}</Button>
+  if (person.role === 'manager' && hireId) {
+    const sent = st.nudges.some((n) => n.hireId === hireId && n.key === `start:${day}`)
+    return <Button size="xs" variant="primary" disabled={sent} onClick={() => { st.nudge(hireId, `start:${day}`, 'Maria Hill', viewer); toast.success(`Proposed ${fmtDay(day)} to Maria Hill`, { description: 'She confirms the change; the hire hears from her, not from a system.' }) }}>{sent ? 'Proposed' : `Propose ${fmtDay(day)}`}</Button>
+  }
+  const text = `Start date: ${fmtDay(day)}. Day One's start-date check shows this date works with current lead times. The onboarding team confirms it once the offer is signed.`
+  return <Button size="xs" variant="primary" onClick={() => { navigator.clipboard?.writeText(text).catch(() => {}); toast.success('Copied for the offer', { description: text }) }}>Copy for the offer</Button>
+}
 
 const VERDICT: Record<DateCheck['verdict'], { label: string; tone: 'green' | 'amber' | 'red' }> = {
   safe: { label: 'Safe', tone: 'green' },
@@ -18,13 +34,13 @@ const VERDICT: Record<DateCheck['verdict'], { label: string; tone: 'green' | 'am
 }
 
 export function StartCheck() {
-  const { viewer, person, compact } = useNav()
+  const { viewer, person, compact, route } = useNav()
   const views = useViews()
   const ctx = useCtx()
   const extra = useDemo((s) => s.extraSessions)
   const mine = Object.values(views).filter((v) => v.status !== 'started' && v.status !== 'withdrawn' && (person.role !== 'manager' || managerFor(v.hire, ctx).id === viewer || v.hire.managerId === viewer))
   const [mode, setMode] = useState<'hire' | 'new'>(person.role === 'recruiter' ? 'new' : 'hire')
-  const [hireId, setHireId] = useState(mine.find((m) => m.hire.id === 'wanda')?.hire.id ?? mine[0]?.hire.id)
+  const [hireId, setHireId] = useState(mine.find((m) => m.hire.id === (route.hireId ?? 'wanda'))?.hire.id ?? mine[0]?.hire.id)
   const [loc, setLoc] = useState<'remote' | 'nyc' | 'chicago' | 'lisbon' | 'london'>('lisbon')
   const [auth, setAuth] = useState(true)
 
@@ -74,8 +90,9 @@ export function StartCheck() {
           )}
         </Card>
         <Card className="p-2">
-          <div className="px-3 pb-2 pt-2 text-[13px]">
-            {earliest ? <>Earliest safe start: <span className="font-semibold">{fmtDay(earliest.day)}</span></> : 'No safe date in the next few weeks.'}
+          <div className="flex flex-wrap items-center justify-between gap-2 px-3 pb-2 pt-2 text-[13px]">
+            <span>{earliest ? <>Earliest safe start: <span className="font-semibold">{fmtDay(earliest.day)}</span></> : 'No safe date in the next few weeks.'}</span>
+            {earliest && <ProposeDate day={earliest.day} hireId={mode === 'hire' ? hireId : undefined} />}
           </div>
           {folded.length > 0 && (
             <details className="group rounded-lg">

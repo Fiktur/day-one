@@ -52,13 +52,14 @@ const check = (ok, msg) => { if (!ok) failures.push(msg); console.log(`${ok ? 'o
         }
       }
     }
-    // Across the weeks before the starts: "Behind" only with something overdue, and the stage never slides back.
+    // Across the weeks before the starts: "Behind" only with something overdue, "At risk" only when the forecast misses the date, and the stage never slides back.
     const last = {}
     for (let day = 10; day <= 27; day++) {
       st.setNow(day)
       for (const v of Object.values(sel.selectViews(window.__demo.getState()))) {
         if (v.status === 'withdrawn' || day >= v.hire.start) continue
-        if (v.status === 'behind' && !v.steps.some((s) => s.state === 'late' || /^Delayed/.test(s.label))) bad(`${v.person.name} is "Behind" on day ${day} with nothing overdue`)
+        if (v.status === 'behind' && !v.steps.some((s) => s.red && (s.state === 'late' || /^Delayed/.test(s.label) || s.ownerAway || s.state === 'confirming'))) bad(`${v.person.name} is "Behind" on day ${day} with nothing overdue`)
+        if (v.status === 'atrisk' && v.forecastEnd != null && v.forecastEnd < v.hire.start) bad(`${v.person.name} is "At risk" on day ${day} though the forecast lands before the start`)
         if (last[v.hire.id] != null && v.stage < last[v.hire.id]) bad(`${v.person.name}'s stage goes back on day ${day}`)
         last[v.hire.id] = v.stage
       }
@@ -164,7 +165,7 @@ const check = (ok, msg) => { if (!ok) failures.push(msg); console.log(`${ok ? 'o
   await page.evaluate(async () => (await import('/src/engine/scenarios.ts')).runScenario(3))
   await page.waitForTimeout(1500)
   const lane = await show('shuri', { name: 'queue' })
-  check(/Waiting on your vendor/.test(lane) && /Chase Firstbase/.test(lane), "IT's queue shows Hal's backorder in the vendor lane with Chase")
+  check(/Your move/.test(lane) && /Chase Firstbase/.test(lane), "IT's queue shows Hal's late vendor step as its move, with Chase")
 
   await reset()
   await page.evaluate(async () => (await import('/src/engine/scenarios.ts')).runScenario(5))
@@ -179,6 +180,94 @@ const check = (ok, msg) => { if (!ok) failures.push(msg); console.log(`${ok ? 'o
   await page.waitForTimeout(1500)
   const gone = await page.evaluate(async () => Object.values((await import('/src/engine/selectors.ts')).selectViews(window.__demo.getState())).find((v) => v.status === 'withdrawn')?.hire.id)
   check(!!gone && /We delete your personal details on/.test(await show(gone, { name: 'home' })), 'withdrawn hire is told when their details are deleted')
+
+  // ---- PR 3: notifications instead of logging in, desktop layout, search ----
+  await reset()
+  await page.evaluate(async () => (await import('/src/engine/scenarios.ts')).runScenario(3))
+  await page.waitForTimeout(1500)
+  await show('maria', { name: 'command' })
+  await page.keyboard.press('o')
+  await page.waitForTimeout(600)
+  const outbox = page.locator('aside[aria-label="Outbox"]')
+  check(/Chase Firstbase/.test(await outbox.innerText()), 'Outbox shows a Chase ping for the backordered laptop')
+  const take = outbox.getByRole('button', { name: 'Take it', exact: true }).first()
+  const claimsBefore = Object.keys((await state()).claims).length
+  if (await take.count()) { await take.click(); await page.waitForTimeout(400) }
+  check(Object.keys((await state()).claims).length === claimsBefore + 1, '"Take it" in a ping claims the step without opening the app')
+  await page.keyboard.press('o')
+
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await show('virgil', { name: 'home' })
+  await page.getByText('Desktop', { exact: true }).first().click()
+  await page.waitForTimeout(800)
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+  check(overflow <= 0 && /your people/i.test(await page.locator('body').innerText()), `desktop hire layout fits 1280px with two columns (overflow ${overflow}px)`)
+  await page.getByText('Phone', { exact: true }).first().click()
+  await page.setViewportSize({ width: 1600, height: 960 })
+
+  await page.keyboard.press('Control+k')
+  await page.waitForTimeout(300)
+  await page.keyboard.type('laptop')
+  await page.waitForTimeout(300)
+  const stepHits = await page.locator('[cmdk-group-heading]:has-text("Steps")').count()
+  await page.locator('[cmdk-group]:has([cmdk-group-heading]:has-text("Steps")) [cmdk-item]').first().click()
+  await page.waitForTimeout(500)
+  const landed = await page.evaluate(() => window.__demo.getState().main.route)
+  check(stepHits === 1 && !!landed.step, `⌘K "laptop" finds steps and opens one (${JSON.stringify(landed)})`)
+
+  await show('maria', { name: 'insights' })
+  await page.getByRole('button', { name: /^Assign to / }).first().click()
+  await page.waitForTimeout(300)
+  check((await page.evaluate(() => window.__demo.getState().assignments.length)) === 1, 'Insights suggestion can be assigned')
+
+  await show('diana', { name: 'startcheck' })
+  const propose = page.getByRole('button', { name: /^Propose / }).first()
+  if (await propose.count()) { await propose.click(); await page.waitForTimeout(300) }
+  check(await page.evaluate(() => window.__demo.getState().nudges.some((n) => n.key.startsWith('start:'))), 'a manager can propose the earliest safe start to Maria')
+
+  // ---- Rescore fixes: need-to-know, quiet Outbox, honest outage pings ----
+  await reset()
+  await show('shuri', { name: 'queue' })
+  await page.keyboard.press('Control+k')
+  await page.waitForTimeout(300)
+  await page.keyboard.type('permit')
+  await page.waitForTimeout(300)
+  const leak = await page.locator('[cmdk-group]:has([cmdk-group-heading]:has-text("Steps"))').innerText().catch(() => '')
+  await page.keyboard.press('Escape')
+  check(!/work permit/i.test(leak), `⌘K as IT doesn't show another team's work permit step${leak ? ` (${leak.slice(0, 80)})` : ''}`)
+
+  const asst = await page.evaluate(async () => (await import('/src/assistant/engine.ts')).respond('carol', 'Is Virgil on track?').text)
+  check(/isn't one of your hires/.test(asst), `the assistant won't tell a manager about someone else's hire ("${asst.slice(0, 60)}")`)
+
+  const pingsTo = (to) => page.evaluate(async (to) => {
+    const sel = await import('/src/engine/selectors.ts')
+    const { pingsFor } = await import('/src/engine/pings.ts')
+    const st = window.__demo.getState()
+    return pingsFor(sel.selectViews(st), st, sel.ctxOf(st)).filter((p) => p.to === to).map((p) => `${p.kind}:${p.title}`)
+  }, to)
+  check((await pingsTo('bruce')).length === 0, 'an out-of-office manager with no cover gets no pings')
+
+  await page.evaluate(async () => (await import('/src/engine/scenarios.ts')).runScenario(5))
+  await page.waitForTimeout(800)
+  await page.evaluate(async () => (await import('/src/staff/program/Incident.tsx')).notifyManagers('checkr', 'maria'))
+  const told = await pingsTo('tony')
+  check(told.length > 0 && told.every((t) => t.startsWith('fyi:')) && told.filter((t) => /Checkr/.test(t)).length === 1, `outage notice reaches a manager as one FYI, not a to-do per step (${told.join(' | ')})`)
+  await page.evaluate(async () => (await import('/src/engine/scenarios.ts')).runScenario(5))
+
+  const jen = await show('jennifer', { name: 'hire', hireId: 'virgil' })
+  check(!/Messages/.test(jen.split('What’s next')[1] ?? '') && !/Activity/.test(jen.split('What’s next')[1] ?? ''), 'Background screening sees no messages or activity on a hire record')
+
+  // ---- Address changes go through Workday; Day One keeps no copy and the chat never invents one ----
+  await reset()
+  const chat = await page.evaluate(async () => { const r = (await import('/src/assistant/engine.ts')).respond('virgil', 'Change my laptop delivery address'); return { text: r.text, addr: window.__demo.getState().addresses.virgil ?? null } })
+  check(chat.addr === null && /form/.test(chat.text), `the assistant points to the address form instead of changing it ("${chat.text.slice(0, 50)}")`)
+  await page.evaluate(() => window.__demo.getState().setNow(16))
+  await show('virgil', { name: 'laptop', step: 'address' })
+  await page.locator('#new-address').fill('500 W Madison St, Chicago, IL')
+  await page.getByRole('button', { name: 'Send to Workday' }).click()
+  await page.waitForTimeout(400)
+  const addr = await page.evaluate(() => { const s = window.__demo.getState(); return { a: s.addresses.virgil, log: s.log.slice(0, 4).map((l) => `${l.system}:${l.event}`) } })
+  check(addr.a === '500 W Madison St, Chicago, IL' && addr.log.includes('workday:address.updated') && addr.log.includes('day one:address.deleted'), `address goes to Workday and Day One deletes its copy (${addr.log.join(', ')})`)
 
   // ---- All eight scenarios run without console errors ----
   await reset()

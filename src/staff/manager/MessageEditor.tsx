@@ -28,9 +28,6 @@ export function MessageEditor({ msg, hireName, onClose, by }: { msg: MsgInstance
         <div className="space-y-2">
           <label htmlFor="msg-body" className="text-xs font-medium text-muted">Message</label>
           <textarea id="msg-body" value={text} onChange={(e) => setText(e.target.value)} rows={9} className="w-full rounded-lg border border-line bg-bg p-3 text-[13px] leading-relaxed focus:border-accent focus:outline-none" />
-          <div className="flex flex-wrap gap-1">
-            {msg.template.rules.map((r) => <span key={r} className="rounded bg-sunken px-1.5 py-0.5 text-[11px] text-muted">{r}</span>)}
-          </div>
         </div>
         <div>
           <div className="mb-2 text-xs font-medium text-muted">Preview as {hireName.split(' ')[0]} sees it</div>

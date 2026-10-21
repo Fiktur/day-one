@@ -8,7 +8,7 @@ import { TODAY, fmtDay, fmtShort } from '../lib/dates'
 import type { Forced } from './simulate'
 import { clockTime, entry, resetClockTime, seedLog, type LogEntry } from './log'
 
-export type Route = { name: string; hireId?: string; tab?: string }
+export type Route = { name: string; hireId?: string; tab?: string; step?: string }
 export interface Pane {
   viewer: string
   route: Route
@@ -67,6 +67,7 @@ interface Data {
   hires: Record<string, HireMut>
   ooo: Record<string, { until: number; delegate: string | null; since?: number }>
   laptopModel: Record<string, string>
+  /** Stands in for Workday, the system of record: Day One reads delivery addresses from there and keeps none of its own. */
   addresses: Record<string, string>
   boards: Record<string, Board>
   templates: Record<string, BoardTemplate>
@@ -82,6 +83,8 @@ interface Data {
   main: Pane
   presenterHidden: boolean
   underHood: boolean
+  /** The Outbox: the pings Day One would send today, so nobody has to log in to check. */
+  outbox: boolean
   tags: boolean
   theme: 'light' | 'dark' | 'system'
   dialog: Dialog
@@ -101,6 +104,8 @@ interface Data {
   /** Who took a team step, by "hire:key". */
   claims: Record<string, string>
   nudges: Nudge[]
+  /** Insights suggestions handed to an owner. */
+  assignments: { title: string; to: string; by: string; day: number }[]
   /** Orientation speakers confirmed in the demo, as "session:time". */
   speakers: string[]
 }
@@ -122,11 +127,13 @@ interface Actions {
   addLog: (...e: LogEntry[]) => void
   flash: (...keys: string[]) => void
   addRequest: (hireId: string, text: string, to: string) => void
+  changeAddress: (hireId: string, address: string, shipped: boolean) => void
   assignBuddy: (hireId: string, buddyId: string, by: string) => void
   savePlan: (hireId: string, plan: PlanDay[], by: string) => void
   setFirstWork: (hireId: string, work: { title: string; link: string }, by: string) => void
   claim: (hireId: string, key: string, by: string) => void
   nudge: (hireId: string, key: string, to: string, by: string) => void
+  assign: (title: string, to: string, by: string) => void
   // Welcome boards
   boardFor: (hireId: string) => Board
   invite: (hireId: string, personIds: string[], by: string) => void
@@ -184,6 +191,7 @@ function initial(): Data {
     main: { viewer: 'maria', route: { name: 'command' } },
     presenterHidden: false,
     underHood: false,
+    outbox: false,
     tags: false,
     theme: 'light',
     dialog: null,
@@ -199,6 +207,7 @@ function initial(): Data {
     firstWork: {},
     claims: {},
     nudges: [],
+    assignments: [],
     speakers: [],
   }
 }
@@ -293,7 +302,7 @@ export const useDemo = create<DemoState>()((set, get) => ({
     get().addLog(
       entry(s.now, hhmm(), 'greenhouse', 'offer.withdrawn', `${nameOf(hireId)} · journey stopped`, 'warn', nameOf(hireId)),
       entry(s.now, hhmm(), 'day one', 'messages.stopped', `${nameOf(hireId)} · all scheduled messages stopped`, 'info', nameOf(hireId)),
-      entry(s.now, hhmm(), 'day one', 'tasks.created', `${nameOf(hireId)} · cancel laptop order (IT), cancel background check (Screening)`, 'info', nameOf(hireId)),
+      entry(s.now, hhmm(), 'day one', 'tasks.created', `${nameOf(hireId)} · cancel laptop order (IT) · background check cancelled with Checkr (Screening)`, 'info', nameOf(hireId)),
     )
   },
 
@@ -329,6 +338,17 @@ export const useDemo = create<DemoState>()((set, get) => ({
     set({ requests: [{ id: `r${s.requests.length + 1}`, hireId, text, day: s.now, to }, ...s.requests] })
   },
 
+  changeAddress: (hireId, address, shipped) => {
+    const s = get()
+    // Day One holds the new address only in transit: Workday stores it, Firstbase reads it from there, and Day One's copy goes once Workday confirms.
+    set({ addresses: { ...s.addresses, [hireId]: address } })
+    get().addLog(
+      entry(s.now, hhmm(), 'workday', 'address.updated', `${nameOf(hireId)} · delivery address changed by the hire`, 'ok', nameOf(hireId)),
+      entry(s.now, hhmm(), 'day one', 'address.deleted', `${nameOf(hireId)} · Workday confirmed, so Day One deleted its copy`, 'info', nameOf(hireId)),
+    )
+    if (shipped) get().addRequest(hireId, 'Reroute the shipped laptop: the new address is in Workday', 'felicity')
+  },
+
   assignBuddy: (hireId, buddyId, by) => {
     set((s) => ({ buddies: { ...s.buddies, [hireId]: buddyId } }))
     get().markDone(hireId, 'buddy', by)
@@ -355,7 +375,13 @@ export const useDemo = create<DemoState>()((set, get) => ({
   nudge: (hireId, key, to, by) => {
     const s = get()
     set({ nudges: [...s.nudges, { hireId, key, to, by, day: s.now }] })
-    get().addLog(entry(s.now, hhmm(), 'day one', 'nudge.sent', `${nameOf(hireId)} · ${STEP_BY_KEY[key]?.name} · ${to} nudged by ${nameOf(by)}`, 'info', nameOf(hireId)))
+    get().addLog(entry(s.now, hhmm(), 'day one', 'nudge.sent', `${nameOf(hireId)} · ${STEP_BY_KEY[key]?.name ?? (key.startsWith('start:') ? `start ${fmtShort(Number(key.slice(6)))} proposed` : key)} · ${to} nudged by ${nameOf(by)}`, 'info', nameOf(hireId)))
+  },
+
+  assign: (title, to, by) => {
+    const s = get()
+    set({ assignments: [...s.assignments, { title, to, by, day: s.now }] })
+    get().addLog(entry(s.now, hhmm(), 'day one', 'suggestion.assigned', `${title} · to ${nameOf(to)} by ${nameOf(by)}`, 'info'))
   },
 
   boardFor: (hireId) => {

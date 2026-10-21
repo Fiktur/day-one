@@ -119,11 +119,12 @@ export const SCENARIOS: Scenario[] = [
       const wasDown = s.down.checkr != null
       s.toggleDown('checkr')
       if (wasDown) {
-        s.addLog(entry(s.now, hhmm(), 'checkr', 'connection.restored', 'Statuses refreshed for 3 hires', 'ok'))
+        s.addLog(entry(s.now, hhmm(), 'checkr', 'connection.restored', 'Statuses refreshed for every waiting check', 'ok'))
         toast.success('Checkr is back', { description: 'Statuses refreshed. Nothing was lost.' })
         burst('small')
       } else {
-        s.addLog(entry(s.now, hhmm(), 'checkr', 'status.poll', 'Timed out after 30 s · retrying every 5 min · 3 steps marked can’t check', 'bad'))
+        const n = Object.values(selectViews(S())).reduce((k, v) => k + v.steps.filter((x) => x.def.system === 'checkr' && x.state === 'unknown').length, 0)
+        s.addLog(entry(s.now, hhmm(), 'checkr', 'status.poll', `Timed out after 30 s · retrying every 5 min · ${n} step${n === 1 ? '' : 's'} marked can’t check`, 'bad'))
         toast.error('Checkr isn’t responding', { description: 'Affected checks now show “can’t check right now”, never green.' })
       }
     },
@@ -162,7 +163,7 @@ export const SCENARIOS: Scenario[] = [
       const s = S()
       if (s.hires.wade.withdrawn != null) return
       s.withdraw('wade')
-      toast('Wade Wilson withdrew from the offer', { description: 'Scheduled messages stopped. IT and Screening each got one cancellation to do.' })
+      toast('Wade Wilson withdrew from the offer', { description: 'Scheduled messages stopped. IT got the laptop cancellation; the background check was cancelled with Checkr.' })
     },
   },
   {

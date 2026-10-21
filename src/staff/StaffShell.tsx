@@ -10,7 +10,7 @@ import { managerFor, safeName } from '../engine/derive'
 import { FixButton, fixFor } from './program/fixes'
 import { prepActionFor } from './manager/PrepActions'
 import { StepActions } from '../ui/StepRow'
-import { systemNames } from '../data/journey'
+import { SYSTEM_STEWARD, systemNames } from '../data/journey'
 import { Avatar, Glyph, Kbd } from '../ui/parts'
 import { PageTransition, motion, springs, Num } from '../ui/motion'
 import { Emoji } from '../ui/assets'
@@ -58,13 +58,15 @@ export function navFor(viewer: string): Item[] {
         { name: 'welcome', label: 'Welcome content', icon: Heart },
         { name: 'journeys', label: 'Journeys', icon: GitBranch },
         { name: 'insights', label: 'Insights', icon: LineChart },
+        { name: 'systems', label: 'Systems', icon: Server },
       ]
     case 'team': {
       const items: Item[] = [
         { name: 'queue', label: 'Queue', icon: ListTodo },
         { name: 'hires', label: 'Hires', icon: Users },
       ]
-      if (p.team === 'hris' || p.team === 'it') items.push({ name: 'systems', label: 'Systems', icon: Server })
+      // Every team runs at least one connected system, so every team can see when it's down.
+      items.push({ name: 'systems', label: 'Systems', icon: Server })
       return items
     }
     case 'head':
@@ -151,11 +153,12 @@ function Notifications() {
   const names = [p.name, p.team ? teams[p.team].name : '']
   const nudgedBy = (hireId: string, key: string) => st.nudges.find((n) => n.hireId === hireId && n.key === key && names.includes(n.to))?.by
   const fyi: { key: string; hireId?: string; text: string }[] = [
-    ...(overseer ? (Object.keys(st.down) as (keyof typeof st.down)[]).map((sys) => ({ key: `down:${sys}`, text: `${systemNames[sys!]} isn't responding. Hires see "updates are delayed".` })) : []),
+    ...(Object.keys(st.down) as (keyof typeof st.down)[]).filter((sys) => overseer || (p.team && SYSTEM_STEWARD[sys!] === p.team)).map((sys) => ({ key: `down:${sys}`, text: `${systemNames[sys!]} isn't responding. Hires see "updates are delayed". Day One retries every 5 minutes.` })),
+    ...(p.role === 'recruiter' ? Object.values(views).filter((v) => v.hire.recruiterId === viewer && v.status === 'atrisk').map((v) => ({ key: `r:${v.hire.id}`, hireId: v.hire.id, text: `${v.person.name}'s start date is at risk. Hold off on promising the date until Maria confirms it.` })) : []),
     ...(p.role === 'manager' ? Object.values(views).filter((v) => managerFor(v.hire, ctx).id === viewer || v.hire.managerId === viewer).flatMap((v) =>
       v.status === 'withdrawn' ? [{ key: `w:${v.hire.id}`, hireId: v.hire.id, text: `${v.person.name} withdrew. Nothing needed from you.` }]
         : v.status === 'atrisk' && v.primary?.holder && !(v.primary.holder.kind === 'person' && v.primary.holder.id === viewer) ? [{ key: `r:${v.hire.id}`, hireId: v.hire.id, text: `${v.person.name}'s start date is at risk. Maria Hill is on it.` }] : []) : []),
-    ...q.vendor.filter((x) => !x.step.red).slice(0, 3).map((x) => ({ key: `v:${x.view.hire.id}:${x.step.key}`, hireId: x.view.hire.id, text: `${x.view.person.name.split(' ')[0]} · ${safeName(x.step, { role: p.role, team: p.team })}: with ${x.step.holder?.name}, ${lc(x.step.label)}` })),
+    ...q.vendor.filter((x) => !x.step.red).slice(0, 3).map((x) => ({ key: `v:${x.view.hire.id}:${x.step.key}`, hireId: x.view.hire.id, text: `${x.view.person.name.split(' ')[0]} · ${safeName(x.step, { role: p.role, team: p.team }, { action: true })}: with ${x.step.holder?.name}, ${lc(x.step.label)}` })),
   ]
   const groups = Array.from(new Set(todo.map((x) => x.view.hire.id))).map((id) => ({ v: views[id], items: todo.filter((x) => x.view.hire.id === id) }))
   const red = todo.filter((x) => x.step.red).length
@@ -171,7 +174,7 @@ function Notifications() {
       }
     >
       <div className="max-h-[420px] overflow-y-auto">
-        <div className="border-b border-line px-3 py-2 text-[13px] font-semibold">{overseer && q.move.length === 0 ? 'Needs attention across all hires' : 'To do'} <span className="font-normal text-muted">· {todo.length}</span></div>
+        <div className="border-b border-line px-3 py-2 text-[13px] font-semibold">{overseer && q.move.length === 0 ? 'Needs attention across all hires' : 'Your move'} <span className="font-normal text-muted">· {todo.length}</span></div>
         <div className="p-1">
           {todo.length === 0 && <div className="px-3 py-4 text-center text-[13px] text-muted"><Emoji name="party" size={30} float className="mx-auto mb-1" />Nothing waiting on you.</div>}
           {groups.map(({ v, items }) => {
@@ -256,8 +259,8 @@ export function StaffShell() {
         {nav}
         <div className="flex-1" />
         {!compact && (
-          <button type="button" onClick={() => setPalette(true)} className="hidden h-8 w-56 items-center justify-between rounded-xl border border-line bg-surface/70 px-2.5 text-[13px] text-faint transition hover:border-accent/40 hover:shadow-glow lg:flex">
-            <span className="flex items-center gap-1.5"><Search className="h-3.5 w-3.5" />Jump to a person or page</span><Kbd>⌘K</Kbd>
+          <button type="button" onClick={() => setPalette(true)} className="hidden h-8 w-64 items-center justify-between gap-2 whitespace-nowrap rounded-xl border border-line bg-surface/70 px-2.5 text-[13px] text-faint transition hover:border-accent/40 hover:shadow-glow lg:flex">
+            <span className="flex items-center gap-1.5"><Search className="h-3.5 w-3.5" />Search people, pages, steps</span><Kbd>⌘K</Kbd>
           </button>
         )}
         <motion.button type="button" aria-label="Ask Day One" onClick={() => setAssistant(true)} whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.9 }} transition={springs.bouncy} className="flex h-8 items-center gap-1.5 rounded-xl btn-gradient px-2.5 text-[12px] font-semibold text-white shadow-glow"><Bot className="h-4 w-4" />{!compact && 'Ask'}</motion.button>

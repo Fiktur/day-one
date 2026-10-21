@@ -121,21 +121,23 @@ function SystemDetail({ sel }: { sel: MapNode }) {
                 ))}
               </dl>
             ) : <p className="text-[13px] text-muted">No API. People confirm these steps in Day One, with the date they happened.</p>}
-            <div className="flex flex-wrap gap-2 pt-1">
-              <Button size="sm" onClick={() => { s.toggleDown(sel); toast(s.down[sel] != null ? `${systemNames[sel]} restored` : `${systemNames[sel]} marked as down`, { description: 'Every affected step updates everywhere.' }) }}>{s.down[sel] != null ? 'Restore connection' : 'Simulate an outage'}</Button>
-              <Button size="sm" variant="ghost" onClick={() => toast.success('Retry sent', { description: 'Failed updates resume from the step that failed, without duplicating orders or checks.' })}><RefreshCw className="h-3.5 w-3.5" />Retry failed updates</Button>
-            </div>
+            {/* Outages are staged from the presenter bar (scenario 5); staff only get the real control. */}
+            {s.down[sel] != null && (
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <Button size="sm" variant="ghost" onClick={() => toast(`${systemNames[sel]} still isn't responding`, { description: 'Nothing was lost. Day One tries again in 5 minutes and resumes from the step that failed.' })}><RefreshCw className="h-3.5 w-3.5" />Retry now</Button>
+              </div>
+            )}
           </Card>
   )
 }
 
 /** What a down system is holding up, and what Day One will retry once it's back. */
-function DownSteps({ sys }: { sys: SystemId }) {
+function DownSteps({ sys, titled }: { sys: SystemId; titled?: boolean }) {
   const { person } = useNav()
   const affected = useAffected(sys)
   return (
     <div className="rounded-xl bg-red-soft/60 px-3 py-2 text-[13px]">
-      <div className="font-medium">{affected.length ? `${affected.length} step${affected.length > 1 ? 's' : ''} can't be checked right now` : 'Nothing is waiting on it right now'}</div>
+      <div className="font-medium">{titled ? `${systemNames[sys]} isn't responding · ` : ''}{affected.length ? `${affected.length} step${affected.length > 1 ? 's' : ''} can't be checked right now` : 'Nothing is waiting on it right now'}</div>
       <ul className="mt-1 space-y-0.5 text-xs">
         {affected.map(({ view, step }) => <li key={view.hire.id + step.key}><span className="font-medium">{view.person.name}</span> · {safeName(step, { role: person.role, team: person.team })}</li>)}
       </ul>
@@ -159,6 +161,8 @@ function MapTab({ sel, setSel }: { sel: MapNode; setSel: (n: MapNode) => void })
   ]
   return (
     <div className="space-y-4">
+      {/* An outage leads the page: what it holds up shows before the map, not under it. */}
+      {(Object.keys(s.down) as SystemId[]).map((sys) => <DownSteps key={sys} sys={sys} titled />)}
       <div className={cn('grid gap-3', compact ? 'grid-cols-2' : 'grid-cols-4')}>
         {stats.map((x, i) => (
           <Reveal key={x.label} i={i}>
@@ -174,7 +178,7 @@ function MapTab({ sel, setSel }: { sel: MapNode; setSel: (n: MapNode) => void })
         <SystemsMap selected={sel} onSelect={setSel} />
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line/70 pt-3">
           <MapLegend />
-          <span className="text-[11px] text-faint">Click a system for its contract. Try scenario 5, or Simulate an outage.</span>
+          <span className="text-[11px] text-faint">Click a system for its contract.</span>
         </div>
       </Card>
       <div className={cn('grid gap-4', compact ? 'grid-cols-1' : 'grid-cols-[minmax(280px,1fr)_minmax(0,1.4fr)]')}>

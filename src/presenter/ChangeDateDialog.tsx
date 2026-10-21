@@ -51,11 +51,11 @@ function Inner({ hireId, initial }: { hireId: string; initial?: number }) {
       width="max-w-2xl"
       footer={
         <>
-          <span className="mr-auto text-xs text-muted">Needs approval from {people[approver].name}. Recorded on the hire’s history. <ReqTag ids="O8 O9" /></span>
+          <span className="mr-auto text-xs text-muted">Confirm once {people[approver].name} agrees. Recorded on the hire’s history. <ReqTag ids="O8 O9" /></span>
           <Button onClick={close}>Cancel</Button>
           <Button variant="primary" disabled={to === v.hire.start || impact.verdict?.verdict === 'no'} title={impact.verdict?.verdict === 'no' ? 'Not achievable: pick a date marked Safe or At risk' : undefined} onClick={() => {
             s.changeStart(hireId, to, 'maria', approver)
-            toast.success(`${v.person.name}’s start date is now ${fmtDay(to)}`, { description: `${impact.replanned} steps re-planned · ${impact.moved} messages moved · ${people[approver].name} approved` })
+            toast.success(`${v.person.name}’s start date is now ${fmtDay(to)}`, { description: `${impact.replanned} steps re-planned · ${impact.moved} messages moved · agreed with ${people[approver].name}` })
             close()
           }}>Confirm new date</Button>
         </>

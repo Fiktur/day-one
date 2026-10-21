@@ -112,7 +112,7 @@ function BoardBuilder({ hireId, compact }: { hireId: string; compact: boolean })
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h3 className="font-semibold">Your welcome message <ReqTag ids="M4" /></h3>
-                <p className="text-xs text-muted">Sends {msg.day != null ? fmtDay(msg.day) : ''} at 9:00 am {first}’s time, in your name. {msg.edited ? 'Your version will send.' : 'The default sends unless you edit it.'} Edits close {msg.editableUntil != null ? fmtDay(msg.editableUntil) : ''}.</p>
+                <p className="text-xs text-muted">Sends {msg.day != null ? fmtDay(msg.day) : ''} at 9:00 am {first}’s time, {v.hire.managerId === viewer ? 'in your name' : `in ${people[v.hire.managerId]?.name.split(' ')[0]}’s name, sent by you`}. {msg.edited ? 'Your version will send.' : 'The default sends unless you edit it.'} Edits close {msg.editableUntil != null ? fmtDay(msg.editableUntil) : ''}.</p>
               </div>
               <Button size="sm" onClick={() => setEditingMsg(true)}>Edit and preview</Button>
             </div>

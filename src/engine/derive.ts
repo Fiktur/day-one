@@ -1,5 +1,6 @@
 import { AREAS, SYSTEM_MODES, SYSTEM_STEWARD, STEP_BY_KEY, systemNames, type Area, type Mode, type Setup, type StepDef, type SystemId } from '../data/journey'
 import { people, providers, teams, type Person, type ProviderId, type TeamId } from '../data/people'
+import { HIRES } from '../data/hires'
 import { bizBetween, daysWord, fmtDay, fmtShort, rel } from '../lib/dates'
 import { simulate, type Forced, type HireState, type SimStep } from './simulate'
 
@@ -92,6 +93,12 @@ export function managerFor(h: HireState, ctx: DeriveCtx): { id: string; away: bo
     return { id: h.managerId, away: true }
   }
   return { id: h.managerId, away: false }
+}
+
+/** Someone who can cover for an absent manager: another manager, not a buddy and not away themselves. */
+export function coverFor(managerId: string, ooo: DeriveCtx['ooo'], now: number): string | undefined {
+  const pool = Object.values(people).filter((p) => p.role === 'manager' && p.id !== managerId && !HIRES.some((h) => h.buddyId === p.id) && !(ooo[p.id] && now <= ooo[p.id].until))
+  return (pool.find((p) => p.id === 'lucius') ?? pool[0])?.id
 }
 
 function ownerRef(def: StepDef, h: HireState, ctx: DeriveCtx): { ref: Ref; away: boolean } {
@@ -248,7 +255,8 @@ export function deriveHire(h: HireState, ctx: DeriveCtx): HireView {
     forecastEnd = Math.max(forecastEnd ?? 0, s.ver)
   }
   const preStart = now < h.start
-  const risk = preStart && !withdrawn && ((forecastEnd != null && forecastEnd >= h.start) || steps.some((s) => s.def.critical && s.red))
+  // At risk means the date won't hold: the forecast lands on or after it, or a red critical step leaves no forecast. A late step with slack is only "Behind".
+  const risk = preStart && !withdrawn && (forecastEnd != null ? forecastEnd >= h.start : steps.some((s) => s.def.critical && s.red))
 
   const active = steps.filter((s) => s.holder && !(s.def.stage >= 5 && preStart))
   // A late step that blocks the start outranks a late one that doesn't.
@@ -264,7 +272,7 @@ export function deriveHire(h: HireState, ctx: DeriveCtx): HireView {
   else if (!preStart) status = 'started'
   else if (risk) status = 'atrisk'
   else if (steps.some((s) => s.state === 'unknown')) status = 'unknown'
-  else if (steps.some((s) => s.def.stage <= 4 && (s.state === 'late' || (s.state === 'soon' && s.eta != null && s.eta > (s.due ?? s.eta))))) status = 'behind'
+  else if (steps.some((s) => s.def.stage <= 4 && s.red && (s.state !== 'soon' || s.eta != null || s.ownerAway))) status = 'behind'
   else if (areas.every((a) => a.state === 'green')) status = 'ready'
   else status = 'ontrack'
 
@@ -276,7 +284,7 @@ export function deriveHire(h: HireState, ctx: DeriveCtx): HireView {
     const pool = critical.length ? critical : pending
     stage = pool.length ? Math.min(...pool.map((s) => s.def.stage)) : Math.max(1, ...steps.filter((s) => s.state === 'verified').map((s) => Math.min(4, s.def.stage)))
     // A late side task (say, emergency contacts) must not pull the stage back behind critical work already done.
-    stage = Math.max(stage, ...steps.filter((s) => s.def.critical && s.def.stage <= 4 && s.state === 'verified').map((s) => s.def.stage))
+    if (!critical.length) stage = Math.max(stage, ...steps.filter((s) => s.def.critical && s.def.stage <= 4 && s.state === 'verified').map((s) => s.def.stage))
   }
 
   const hireTasks = steps.filter((s) => s.def.owner.type === 'hire' && s.def.hire)
@@ -310,7 +318,10 @@ const TO_DO: StepState[] = ['blank', 'open', 'soon', 'late', 'unknown']
 /** A step's name as this viewer may see it. `action` gives the to-do form while the step is still to be done. */
 export function safeName(s: StepView, viewer: { role: string; team?: TeamId }, opts?: { action?: boolean }): string {
   if (stepIsSensitiveFor(s.def, viewer) && s.def.safe) return s.state === 'verified' ? s.def.safe.done : s.def.safe.open
-  if (opts?.action && s.def.task && s.name === s.def.name && TO_DO.includes(s.state)) return s.def.task
+  if (opts?.action && TO_DO.includes(s.state)) {
+    const task = s.name === s.def.name ? s.def.task : s.def.renameTask
+    if (task) return task
+  }
   return s.name
 }
 

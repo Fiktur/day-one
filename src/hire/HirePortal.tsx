@@ -26,7 +26,7 @@ const TAB_ORDER = TABS.map((t) => t.name)
 
 const SUBPAGES: Record<string, string> = { firstweek: 'Your first week', people: 'Your people', company: 'Company and benefits', details: 'Your details', laptop: 'Your laptop' }
 
-export function HirePortal({ frame }: { frame: 'phone' | 'none' }) {
+export function HirePortal({ frame }: { frame: 'phone' | 'none' | 'desktop' }) {
   const { viewer, route, go, compact } = useNav()
   const v = useView(viewer)
   const now = useDemo((s) => s.now)
@@ -42,6 +42,11 @@ export function HirePortal({ frame }: { frame: 'phone' | 'none' }) {
   const own = v.hireTasks.filter(isOwnActionable)
   const red = own.some((s) => s.red)
   const withdrawn = v.status === 'withdrawn'
+  const desktop = frame === 'desktop'
+  // After week two the home already is the ramp, so the hire only needs Home and Help.
+  const tabs = v.status === 'started' && now - v.hire.start >= 14 ? TABS.filter((t) => t.name === 'home' || t.name === 'help') : TABS
+  const isOn = (name: string) => route.name === name || (name === 'home' && ['firstweek', 'people', 'company'].includes(route.name)) || (name === 'tasks' && ['details', 'laptop'].includes(route.name))
+  const badgeOf = (name: string) => (name === 'tasks' ? own.length : name === 'welcome' ? boardNew : 0)
 
   const body: ReactNode = withdrawn ? <Withdrawn /> : (() => {
     switch (route.name) {
@@ -54,7 +59,7 @@ export function HirePortal({ frame }: { frame: 'phone' | 'none' }) {
       case 'details': return <DetailsPage />
       case 'laptop': return <LaptopPage />
       case 'signin': return <SignIn />
-      default: return <HireHome />
+      default: return <HireHome wide={desktop} />
     }
   })()
 
@@ -76,20 +81,31 @@ export function HirePortal({ frame }: { frame: 'phone' | 'none' }) {
               <span className="grid h-6 w-6 place-items-center rounded-lg btn-gradient text-[11px] font-extrabold text-white shadow-glow">N</span>Northbeam
             </span>
           )}
+          {desktop && showNav && (
+            <nav aria-label="Portal" className="flex items-center gap-1">
+              {tabs.map((t) => (
+                <motion.button key={t.name} type="button" whileTap={{ scale: 0.92 }} onClick={() => go({ name: t.name })} className={cn('relative flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[13px] transition-colors', isOn(t.name) ? 'font-semibold text-accent' : 'text-muted hover:text-ink')}>
+                  {isOn(t.name) && <motion.span layoutId={`dtab-${tabId}`} transition={springs.bouncy} className="absolute inset-0 -z-10 rounded-xl bg-accent-soft" />}
+                  <t.icon className="h-4 w-4" />{t.label}
+                  {badgeOf(t.name) > 0 && <span className={cn('grid h-4 min-w-4 place-items-center rounded-full px-1 text-[9px] font-bold text-white', t.name === 'tasks' ? (red ? 'bg-red' : 'bg-amber') : 'bg-accent')}>{badgeOf(t.name)}</span>}
+                </motion.button>
+              ))}
+            </nav>
+          )}
           <motion.button whileTap={{ scale: 0.88 }} whileHover={{ scale: 1.06 }} transition={springs.bouncy} type="button" onClick={() => go({ name: 'signin' })} className="rounded-full ring-2 ring-white shadow-card" aria-label="Account">
             <Avatar id={viewer} size={30} />
           </motion.button>
         </header>
       )}
-      <div ref={scroller} className={cn('relative min-h-0 flex-1 overflow-x-hidden', fill ? 'overflow-y-hidden' : 'scroll-thin overflow-y-auto', showNav ? (fill ? 'pb-[78px]' : 'pb-24') : 'pb-4')}>
-        <PageTransition id={route.name} direction={dir} className={fill ? 'h-full' : undefined}>{body}</PageTransition>
+      <div ref={scroller} className={cn('relative min-h-0 flex-1 overflow-x-hidden', fill ? 'overflow-y-hidden' : 'scroll-thin overflow-y-auto', desktop ? 'pb-4' : showNav ? (fill ? 'pb-[78px]' : 'pb-24') : 'pb-4')}>
+        <PageTransition id={route.name} direction={dir} className={cn(fill && 'h-full', desktop && route.name !== 'home' && 'mx-auto w-full max-w-2xl')}>{body}</PageTransition>
       </div>
       <DayOneMoment />
-      {showNav && (
+      {showNav && !desktop && (
         <nav className="glass absolute inset-x-3 bottom-3 z-20 flex justify-around rounded-[22px] border border-white/80 px-1.5 py-1.5 shadow-lift ring-1 ring-ink/5" aria-label="Portal">
-          {(v.status === 'started' && now - v.hire.start >= 14 ? TABS.filter((t) => t.name === 'home' || t.name === 'help') : TABS).map((t) => {
-            const on = route.name === t.name || (t.name === 'home' && ['firstweek', 'people', 'company'].includes(route.name)) || (t.name === 'tasks' && ['details', 'laptop'].includes(route.name))
-            const badge = t.name === 'tasks' ? own.length : t.name === 'welcome' ? boardNew : 0
+          {tabs.map((t) => {
+            const on = isOn(t.name)
+            const badge = badgeOf(t.name)
             return (
               <motion.button key={t.name} type="button" whileTap={{ scale: 0.86 }} onClick={() => { go({ name: t.name }); sfx('tick') }} className={cn('relative flex min-w-[62px] flex-col items-center gap-0.5 rounded-2xl px-2 py-1.5 text-[10.5px] transition-colors', on ? 'font-semibold text-accent' : 'text-muted')}>
                 {on && <motion.span layoutId={`tab-${tabId}`} transition={springs.bouncy} className="absolute inset-0 -z-10 rounded-2xl bg-accent-soft" />}
@@ -110,7 +126,7 @@ export function HirePortal({ frame }: { frame: 'phone' | 'none' }) {
     </div>
   )
 
-  if (frame === 'none') return <div className="h-full">{screen}</div>
+  if (frame !== 'phone') return <div className="h-full">{screen}</div>
   return <PhoneFrame compact={compact}>{screen}</PhoneFrame>
 }
 

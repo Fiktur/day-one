@@ -95,7 +95,7 @@ export function MainView() {
             <ViewerPicker viewer={main.viewer} onPick={setMainViewer} />
             {!tiny && <Segmented className="glass shadow-card" value={frame} onChange={setFrame} options={[['phone', <span key="p" className="flex items-center gap-1"><Smartphone className="h-3.5 w-3.5" />Phone</span>], ['none', <span key="d" className="flex items-center gap-1"><Monitor className="h-3.5 w-3.5" />Desktop</span>]] as const} />}
           </div>
-          {frame === 'phone' ? <HirePortal frame="phone" /> : <div className="h-[calc(100%-60px)] w-full max-w-2xl overflow-hidden rounded-[22px] border border-white/80 bg-bg shadow-lift"><HirePortal frame="none" /></div>}
+          {frame === 'phone' ? <HirePortal frame="phone" /> : <div className={cn('h-[calc(100%-60px)] w-full overflow-hidden rounded-[22px] border border-white/80 bg-bg shadow-lift', tiny ? 'max-w-2xl' : 'max-w-5xl')}><HirePortal frame={tiny ? 'none' : 'desktop'} /></div>}
         </div>
       ) : (
         <StaffShell />

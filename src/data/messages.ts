@@ -100,6 +100,6 @@ export const FROM_LABEL: Record<MsgFrom, string> = {
   company: 'Pepper Potts, Head of People',
   manager: 'Hiring manager',
   program: 'Maria Hill, Onboarding team',
-  buddy: 'Buddy',
+  buddy: 'Buddy (not picked yet)',
   it: 'Northbeam IT',
 }

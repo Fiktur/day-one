@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ArrowLeft, Eye, Lock, Pencil } from 'lucide-react'
-import { cn, lc } from '../../lib/cn'
+import { cn, lc, plural } from '../../lib/cn'
 import { useNav } from '../../nav/NavContext'
 import { useDemo } from '../../engine/store'
 import { useView, ctxOf, useCtx } from '../../engine/selectors'
@@ -22,6 +22,7 @@ export function ManagerHire() {
   const ctx = useCtx()
   const edits = useDemo((s) => s.msgEdits)
   const board = useDemo((s) => s.boards[route.hireId ?? ''])
+  const proposed = useDemo((s) => [...s.nudges].reverse().find((n) => n.hireId === route.hireId && n.key.startsWith('start:')))
   const [editing, setEditing] = useState<string | null>(null)
   if (!v) return null
   // Once the hire has started, the manager's part is the ramp: confirm the first contribution, hold the check-in.
@@ -33,7 +34,7 @@ export function ManagerHire() {
   // Some hires did their board steps before the studio existed; fall back to the steps so the card never says "Not started" over a done step.
   const boardSteps = [v.by.hello, v.by.board_invite].filter(Boolean)
   const boardLine = board
-    ? `${board.status === 'live' ? `Shared ${fmtShort(board.shared!)}` : 'Draft'} · ${board.posts.length} posts · ${board.invites.filter((i) => i.status === 'invited').length} invites waiting`
+    ? `${board.status === 'live' ? `Shared ${fmtShort(board.shared!)}` : 'Draft'} · ${board.posts.length} posts · ${plural(board.invites.filter((i) => i.status === 'invited').length, 'invite')} waiting`
     : boardSteps.some((x) => x!.state === 'verified')
       ? boardSteps.map((x) => `${x!.key === 'hello' ? 'Hello' : 'Invites'} ${x!.state === 'verified' ? `done ${fmtShort(x!.ver!)}` : 'not yet'}`).join(' · ')
       : 'Not started'
@@ -65,7 +66,7 @@ export function ManagerHire() {
               <span className={cn('text-xs', ball.red ? 'text-red' : 'text-muted')}>· {lc(ball.label)}</span>
             </div>
           )}
-          {v.status === 'atrisk' && !prep.some((s) => s.holder?.id === viewer && s.red) && <p className="mt-2 text-xs text-muted">The start date is at risk. Maria Hill is on it; nothing needed from you yet. If the date moves, you'll be asked to approve it.</p>}
+          {v.status === 'atrisk' && !prep.some((s) => s.holder?.id === viewer && s.red) && <p className="mt-2 text-xs text-muted">The start date is at risk. Maria Hill is on it; nothing needed from you yet. {proposed ? `You proposed ${fmtShort(Number(proposed.key.slice(6)))}; Maria will confirm it with you.` : <>If the date moves, you'll be asked to approve it. <button type="button" className="font-semibold text-accent" onClick={() => go({ name: 'startcheck', hireId: v.hire.id })}>Check other dates</button></>}</p>}
         </Card>
       )}
 
@@ -111,9 +112,10 @@ export function ManagerHire() {
                     </div>
                     {m.edited && <span className="rounded bg-accent-soft px-1.5 py-0.5 text-[10px] font-semibold text-accent">Edited</span>}
                   </div>
-                  {m.editableUntil != null && m.status === 'scheduled' && (
+                  {/* Anything still to send in the manager's name can be edited, until its edit window closes. */}
+                  {m.template.from === 'manager' && (m.status === 'scheduled' || m.status === 'waiting') && (m.editableUntil == null || now <= m.editableUntil) && (
                     <>
-                      <p className="mt-1.5 text-xs text-muted">{m.edited ? 'Your version will send.' : 'The default sends unless you edit it'} · edits close {fmtDay(m.editableUntil)}</p>
+                      <p className="mt-1.5 text-xs text-muted">{m.edited ? 'Your version will send.' : 'The default sends unless you edit it'}{m.editableUntil != null ? ` · edits close ${fmtDay(m.editableUntil)}` : ''}</p>
                       <div className="mt-2 flex gap-2">
                         <Button size="xs" onClick={() => setEditing(m.key)}><Eye className="h-3 w-3" />Preview</Button>
                         <Button size="xs" onClick={() => setEditing(m.key)}><Pencil className="h-3 w-3" />Edit</Button>

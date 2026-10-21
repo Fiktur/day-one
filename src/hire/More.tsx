@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Check, ExternalLink, KeyRound, Laptop, Lock, Mail, MapPin, Package, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '../lib/cn'
@@ -8,7 +8,7 @@ import { useDemo } from '../engine/store'
 import { people } from '../data/people'
 import { PEPPER_VIDEO } from '../data/welcome'
 import { fmtDay, fmtWeekdayShort, rel } from '../lib/dates'
-import { managerFor } from '../engine/derive'
+import { managerFor, type HireView } from '../engine/derive'
 import { ctxOf } from '../engine/selectors'
 import { Avatar, Button, Glyph, ReqTag } from '../ui/parts'
 import { VideoPlayer } from '../ui/video'
@@ -16,7 +16,7 @@ import { burst } from '../ui/fx'
 import { Emoji, type EmojiName } from '../ui/assets'
 import { motion, springs } from '../ui/motion'
 import { ShipTracker } from './Home'
-import { buddyOf, usePlan } from './helpers'
+import { buddyOf, confirmBy, heldBack, usePlan } from './helpers'
 
 export function FirstWeek() {
   const { viewer } = useNav()
@@ -28,6 +28,9 @@ export function FirstWeek() {
   const planReady = v.by.first_week?.state === 'verified'
   const { plan } = usePlan(v)
   const days = plan.map((items, i) => ({ d: h.start + i, items: items.map((x) => [x.t, x.l]) }))
+  if (heldBack(v, now)) {
+    return <div className="px-4 pb-6"><div className="rounded-2xl bg-sunken px-3.5 py-3 text-[13px] text-muted">Your first week moves with your new start date. {people.maria.name.split(' ')[0]} will share it once the date is confirmed, by {fmtDay(confirmBy(h.start, now))}.</div></div>
+  }
   return (
     <div className="space-y-3 px-4 pb-6">
       {!planReady && (
@@ -50,7 +53,7 @@ export function FirstWeek() {
           </li>
         ))}
       </ol>
-      <p className="px-1 text-xs text-muted">{h.mode === 'remote' ? 'You’re starting remotely. Your laptop arrives set up; on day one you just sign in.' : `You’re starting at the ${h.location}. Pick up your badge at the front desk at 8:45.`}</p>
+      <p className="px-1 text-xs text-muted">{h.mode !== 'remote' ? `You’re starting at the ${h.location}. Pick up your badge at the front desk at 8:45.` : (v.by.laptop_deliver?.ver ?? 0) >= h.start && v.by.laptop_deliver?.state !== 'verified' ? `You’re starting remotely. Your laptop lands after your start date, so ${people.maria.name.split(' ')[0]} will tell you the plan for day one.` : 'You’re starting remotely. Your laptop arrives set up; on day one you just sign in.'}</p>
       {now >= h.start - 7 && <p className="px-1 text-xs text-faint">Updated {rel(now, now)}.</p>}
     </div>
   )
@@ -197,7 +200,7 @@ export function DetailsPage() {
           </label>
         ))}
       </div>
-      <p className="flex items-start gap-1.5 text-xs text-muted"><MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />We delete your delivery address 30 days after your laptop arrives. Tax and bank details go straight into Workday, never Day One.</p>
+      <p className="flex items-start gap-1.5 text-xs text-muted"><MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />Your address and your tax and bank details live in Workday. Day One passes changes straight through and keeps no copy.</p>
       <Button variant="primary" size="md" className="w-full" onClick={(e) => { burst('small', e.currentTarget); if (step && step.state !== 'verified') markDone(viewer, 'details', viewer); toast.success('Details confirmed', { description: 'Sent to Workday and Firstbase. You won’t be asked again.' }); go({ name: 'tasks' }) }}>
         {step?.state === 'verified' ? 'Save changes' : 'Confirm details'}
       </Button>
@@ -215,6 +218,7 @@ export function LaptopPage() {
   const set = useDemo((s) => s.set)
   const laptopModel = useDemo((s) => s.laptopModel)
   const chosen = v.by.laptop_choice?.state === 'verified'
+  const arrives = v.by.laptop_deliver?.state === 'verified' ? null : v.by.laptop_deliver?.ver
   const options = ['MacBook Pro 14"', 'MacBook Pro 16"', 'ThinkPad X1 Carbon']
   const [pick, setPick] = useState(model)
   const track = [
@@ -239,7 +243,7 @@ export function LaptopPage() {
             ))}
           </div>
           <div className="rounded-2xl border border-line bg-surface p-3 text-[13px] shadow-card"><div className="text-xs text-muted">Deliver to</div><div className="font-medium">{address}</div></div>
-          <Button variant="primary" size="md" className="w-full" onClick={(e) => { burst('small', e.currentTarget); set({ laptopModel: { ...laptopModel, [viewer]: pick } }); markDone(viewer, 'laptop_choice', viewer); toast.success(`${pick} chosen`, { description: 'It ships after your background check.' }) }}>Choose {pick}</Button>
+          <Button variant="primary" size="md" className="w-full" onClick={(e) => { burst('small', e.currentTarget); set({ laptopModel: { ...laptopModel, [viewer]: pick } }); markDone(viewer, 'laptop_choice', viewer); toast.success(`${pick} chosen`, { description: "We'll tell you when it ships." }) }}>Choose {pick}</Button>
         </>
       ) : (
         <>
@@ -265,10 +269,41 @@ export function LaptopPage() {
               )
             })}
           </ol>
-          <p className="flex items-start gap-2 px-1 text-xs text-muted"><Emoji name="key" size={18} className="shrink-0" />Arrives set up and enrolled. On {fmtWeekdayShort(v.hire.start)} you just sign in.</p>
-          <Button variant="secondary" size="md" className="w-full" onClick={() => go({ name: 'help' })}><MapPin className="h-4 w-4" />Change the delivery address</Button>
+          <p className="flex items-start gap-2 px-1 text-xs text-muted"><Emoji name="key" size={18} className="shrink-0" />{arrives != null && arrives >= v.hire.start
+            ? `Taking longer than usual: expected ${fmtDay(arrives)}, after your start date. ${people.maria.name.split(' ')[0]} will tell you the plan for day one by ${fmtDay(confirmBy(v.hire.start, now))}.`
+            : `Arrives set up and enrolled. On ${fmtWeekdayShort(v.hire.start)} you just sign in.`}</p>
+          <AddressChange v={v} address={address} />
         </>
       )}
     </div>
+  )
+}
+
+/** The new address goes straight to Workday, the system of record. Day One deletes its copy once Workday confirms. */
+function AddressChange({ v, address }: { v: HireView; address: string }) {
+  const { route, go } = useNav()
+  const changeAddress = useDemo((s) => s.changeAddress)
+  const [open, setOpen] = useState(route.step === 'address')
+  // Opened from chat: take the flag off the route so the next hire on this page doesn't start with the form open.
+  useEffect(() => { if (route.step === 'address') go({ name: 'laptop' }) }, [route.step, go])
+  const [draft, setDraft] = useState('')
+  const shipped = v.by.laptop_ship?.state === 'verified'
+  if (!open) return <Button variant="secondary" size="md" className="w-full" onClick={() => setOpen(true)}><MapPin className="h-4 w-4" />Change the delivery address</Button>
+  const send = () => {
+    changeAddress(v.hire.id, draft.trim(), shipped)
+    toast.success('Address updated in Workday', { description: shipped ? 'Your laptop already shipped, so IT will reroute it. Day One kept no copy.' : 'Your laptop order picks it up from there. Day One kept no copy.' })
+    setOpen(false)
+    setDraft('')
+  }
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); if (draft.trim()) send() }} className="space-y-2 rounded-[22px] border border-line bg-surface p-3.5 shadow-card">
+      <label className="block text-[13px] font-semibold" htmlFor="new-address">New delivery address</label>
+      <input id="new-address" autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={address} autoComplete="street-address" className="w-full rounded-xl border border-line bg-bg px-3 py-2 text-[14px] outline-none focus:border-accent" />
+      <p className="flex items-start gap-1.5 text-xs text-muted"><Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />Goes straight to Workday, where your address already lives. Day One deletes its copy as soon as Workday confirms.{shipped ? ' Your laptop has shipped, so IT will reroute it.' : ''}</p>
+      <div className="flex gap-2">
+        <Button type="submit" variant="primary" size="md" className="flex-1" disabled={!draft.trim()}>Send to Workday</Button>
+        <Button type="button" size="md" onClick={() => { setOpen(false); setDraft('') }}>Cancel</Button>
+      </div>
+    </form>
   )
 }

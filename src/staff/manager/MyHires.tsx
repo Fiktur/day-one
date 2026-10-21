@@ -108,10 +108,10 @@ function HireCard({ v }: { v: HireView }) {
       <div className="text-[13px] tnum">{startLine(v, now)}{v.dateMoved && <span className="text-muted"> · moved from {fmtShort(v.hire.originalStart)}</span>}</div>
       <ReadinessBar areas={v.areas} mineArea={myMoves.some((s) => s.def.area === 'prep') ? 'prep' : null} />
       {ball && ball.holder && (
-        <div className="flex min-w-0 items-center gap-2 text-xs text-muted">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
           <span className="shrink-0">Waiting on</span>
           <BallChip step={ball} now={now} size="sm" />
-          <span className="truncate">{safeName(ball, { role: person.role, team: person.team }, { action: true })}</span>
+          <span>{safeName(ball, { role: person.role, team: person.team }, { action: true })}</span>
         </div>
       )}
       {myMoves.length > 0 && (
@@ -146,9 +146,9 @@ function RampCard({ v }: { v: HireView }) {
       <Eyebrow>First 90 days <ReqTag ids="T10" /></Eyebrow>
       <div className="space-y-1.5">
         {ramp.map((s) => (
-          <div key={s.key} className="flex items-center gap-2 text-xs">
+          <div key={s.key} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
             <Glyph state={s.state === 'open' ? 'prog' : s.state} size={12} />
-            <span className={cn('flex-1 truncate', s.state === 'blank' ? 'text-muted' : 'font-medium')}>{s.name}</span>
+            <span className={cn('min-w-[9rem] flex-1', s.state === 'blank' ? 'text-muted' : 'font-medium')}>{s.name}</span>
             <span className="shrink-0 text-muted">{s.state === 'verified' ? fmtShort(s.ver!) : s.label.replace('Due ', 'by ')}</span>
             <StepActions view={v} step={s} />
           </div>
