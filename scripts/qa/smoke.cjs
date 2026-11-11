@@ -269,6 +269,19 @@ const check = (ok, msg) => { if (!ok) failures.push(msg); console.log(`${ok ? 'o
   const addr = await page.evaluate(() => { const s = window.__demo.getState(); return { a: s.addresses.virgil, log: s.log.slice(0, 4).map((l) => `${l.system}:${l.event}`) } })
   check(addr.a === '500 W Madison St, Chicago, IL' && addr.log.includes('workday:address.updated') && addr.log.includes('day one:address.deleted'), `address goes to Workday and Day One deletes its copy (${addr.log.join(', ')})`)
 
+  // ---- Minor fixes: a real retry, and one line for the later safe dates ----
+  await reset()
+  await page.evaluate(async () => (await import('/src/engine/scenarios.ts')).runScenario(5))
+  await page.waitForTimeout(600)
+  await show('barbara', { name: 'systems' })
+  await page.getByRole('button', { name: 'Retry now' }).first().click()
+  await page.waitForTimeout(400)
+  const retried = await page.evaluate(() => { const s = window.__demo.getState(); return { r: !!s.retried.checkr, log: s.log[0]?.outcome ?? '' } })
+  check(retried.r && /Retried by Barbara/.test(retried.log) && /last tried .* by Barbara/.test(await page.locator('main, body').first().innerText()), `"Retry now" retries, logs it and updates the retry line (${retried.log})`)
+  await reset()
+  const peter = await show('tony', { name: 'startcheck', hireId: 'peter' })
+  check(/Also safe:/.test(peter) && (peter.match(/Safe/g) ?? []).length <= 2, 'the start-date check lists later safe dates on one line')
+
   // ---- All eight scenarios run without console errors ----
   await reset()
   for (const n of [1, 2, 3, 4, 5, 6, 7, 8]) {

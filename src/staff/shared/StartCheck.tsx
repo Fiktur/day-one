@@ -5,7 +5,7 @@ import { useDemo } from '../../engine/store'
 import { useViews, ctxOf, useCtx } from '../../engine/selectors'
 import { managerFor } from '../../engine/derive'
 import { checkDates, hypothetical, type DateCheck } from '../../engine/startcheck'
-import { fmtDay } from '../../lib/dates'
+import { fmtDay, fmtShort } from '../../lib/dates'
 import { Avatar, Button, Card, Glyph, Pill, ReqTag } from '../../ui/parts'
 import { toast } from 'sonner'
 import { Page, PageHeader } from '../StaffShell'
@@ -54,6 +54,10 @@ export function StartCheck() {
   const firstOk = results.findIndex((r) => r.verdict !== 'no')
   const noRun = firstOk === -1 ? results : results.slice(0, firstOk)
   const folded = noRun.length > 1 ? noRun : []
+  // After the earliest safe date, more safe dates only add length: they share one line.
+  const rest = results.filter((r) => !folded.includes(r))
+  const laterSafe = rest.filter((r) => r.verdict === 'safe' && r !== earliest)
+  const shown = rest.filter((r) => !laterSafe.includes(r))
   const row = (r: DateCheck) => (
     <div key={r.day} className={cn('grid grid-cols-[16px_110px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-3 py-2.5', r.verdict === 'safe' && r === earliest && 'bg-green-soft/60')}>
       <Glyph state={r.verdict === 'safe' ? 'verified' : r.verdict === 'risk' ? 'open' : 'late'} />
@@ -104,7 +108,13 @@ export function StartCheck() {
               {folded.map(row)}
             </details>
           )}
-          {results.filter((r) => !folded.includes(r)).map(row)}
+          {shown.map(row)}
+          {laterSafe.length > 0 && (
+            <div className="grid grid-cols-[16px_minmax(0,1fr)] items-center gap-3 px-3 py-2.5 text-[13px]">
+              <Glyph state="verified" />
+              <span><span className="font-medium">Also safe:</span> <span className="text-muted">{laterSafe.map((r) => fmtShort(r.day)).join(', ')}</span></span>
+            </div>
+          )}
           <p className="px-3 pb-2 pt-3 text-[11px] text-faint">Lead times come from when steps actually happened for the last 62 hires, including dates people entered by hand.</p>
         </Card>
       </div>

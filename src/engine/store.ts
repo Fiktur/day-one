@@ -63,6 +63,8 @@ interface Data {
   now: number
   setup: Setup
   down: Partial<Record<SystemId, number>>
+  /** The last manual retry of a down system: when, and who asked. */
+  retried: Partial<Record<SystemId, { at: string; by: string }>>
   forced: Forced[]
   hires: Record<string, HireMut>
   ooo: Record<string, { until: number; delegate: string | null; since?: number }>
@@ -87,6 +89,8 @@ interface Data {
   outbox: boolean
   tags: boolean
   theme: 'light' | 'dark' | 'system'
+  /** Goes up on every reset, so anything outside this store (assistant chats) can start over too. */
+  epoch: number
   dialog: Dialog
   palette: boolean
   lastScenario: number | null
@@ -124,6 +128,7 @@ interface Actions {
   withdraw: (hireId: string) => void
   delegate: (managerId: string, delegateId: string | null) => void
   toggleDown: (system: SystemId) => void
+  retry: (system: SystemId, by: string) => void
   addLog: (...e: LogEntry[]) => void
   flash: (...keys: string[]) => void
   addRequest: (hireId: string, text: string, to: string) => void
@@ -168,6 +173,7 @@ function initial(): Data {
     now: TODAY,
     setup: 'connected',
     down: {},
+    retried: {},
     forced: [],
     hires: Object.fromEntries(HIRES.map((h) => [h.id, { start: h.start, originalStart: h.start, withdrawn: null }])),
     ooo: JSON.parse(JSON.stringify(OUT_OF_OFFICE)),
@@ -194,6 +200,7 @@ function initial(): Data {
     outbox: false,
     tags: false,
     theme: 'light',
+    epoch: 0,
     dialog: null,
     palette: false,
     lastScenario: null,
@@ -318,7 +325,15 @@ export const useDemo = create<DemoState>()((set, get) => ({
     const down = { ...s.down }
     if (down[system] != null) delete down[system]
     else down[system] = s.now
-    set({ down })
+    const retried = { ...s.retried }
+    delete retried[system]
+    set({ down, retried })
+  },
+
+  retry: (system, by) => {
+    const at = hhmm().slice(0, 5)
+    set((s) => ({ retried: { ...s.retried, [system]: { at, by } } }))
+    get().addLog(entry(get().now, hhmm(), system, 'status.poll', `Retried by ${nameOf(by)} · still timing out · next automatic try in 5 min`, 'bad'))
   },
 
   addLog: (...e) => set((s) => ({ log: [...e.reverse(), ...s.log].slice(0, 200) })),
@@ -509,7 +524,7 @@ export const useDemo = create<DemoState>()((set, get) => ({
     while (timers.length) window.clearTimeout(timers.pop())
     resetClockTime()
     const s = get()
-    set({ ...initial(), theme: s.theme, split: s.split, sound: s.sound, intro: false, presenterHidden: false })
+    set({ ...initial(), theme: s.theme, split: s.split, sound: s.sound, intro: false, presenterHidden: false, epoch: s.epoch + 1 })
     toast.dismiss()
     toast('Demo reset', { description: 'Back to Thursday, Oct 15, 9:00 am.' })
   },

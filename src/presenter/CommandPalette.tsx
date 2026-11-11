@@ -11,7 +11,6 @@ import { managerFor, safeName, type HireView, type StepView } from '../engine/de
 import { Emoji, type EmojiName } from '../ui/assets'
 import { navFor } from '../staff/StaffShell'
 import type { Route } from '../engine/store'
-import { clearChats } from '../assistant/AssistantPanel'
 
 const NAV_EMOJI: Record<string, EmojiName> = {
   myhires: 'smile', studio: 'heart', startcheck: 'calendar', covering: 'handshake', candidates: 'magnifier', command: 'target',
@@ -121,7 +120,7 @@ export function CommandPalette() {
                 <Command.Item value="outbox notifications pings slack email" onSelect={() => { set({ outbox: true }); close() }} className={item}>Outbox: today's notifications</Command.Item>
                 <Command.Item value="requirement tags" onSelect={() => { set({ tags: !useDemo.getState().tags }); close() }} className={item}>Toggle requirement tags</Command.Item>
                 <Command.Item value="automatic manual updates setup" onSelect={() => { useDemo.getState().setSetup(useDemo.getState().setup === 'manual' ? 'connected' : 'manual'); close() }} className={item}>Switch automatic / manual updates</Command.Item>
-                <Command.Item value="reset demo" onSelect={() => { useDemo.getState().reset(); clearChats(); close() }} className={item}>Reset the demo</Command.Item>
+                <Command.Item value="reset demo" onSelect={() => { useDemo.getState().reset(); close() }} className={item}>Reset the demo</Command.Item>
               </Command.Group>
             </Command.List>
           </Command>
