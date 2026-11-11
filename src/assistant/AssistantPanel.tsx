@@ -3,6 +3,7 @@ import { create } from 'zustand'
 import { ArrowUp, Check, Info, ShieldCheck, UserRound } from 'lucide-react'
 import { cn } from '../lib/cn'
 import { people } from '../data/people'
+import { useDemo } from '../engine/store'
 import { respond, suggestionsFor, type AssistantReply } from './engine'
 import { workersAI } from './providers'
 import { Avatar, Button, ReqTag, Tooltip } from '../ui/parts'
@@ -24,7 +25,8 @@ const useChats = create<{ chats: Record<string, Msg[]>; push: (viewer: string, m
   patch: (viewer, id, p) => set((s) => ({ chats: { ...s.chats, [viewer]: (s.chats[viewer] ?? []).map((m) => (m.id === id ? { ...m, ...p } : m)) } })),
   clear: () => set({ chats: {} }),
 }))
-export const clearChats = () => useChats.getState().clear()
+// A demo reset starts every conversation over, however the reset was triggered.
+useDemo.subscribe((st, prev) => { if (st.epoch !== prev.epoch) useChats.getState().clear() })
 
 let seq = 0
 const EMPTY: Msg[] = []

@@ -49,8 +49,10 @@ export function suggestionsFor(viewer: string): string[] {
       // Only the viewer's own hires (or those they cover): the chips never suggest asking about someone else's.
       const st = S()
       const mine = Object.values(selectViews(st)).filter((v) => managerFor(v.hire, ctxOf(st)).id === viewer && v.hire.start > st.now && v.status !== 'withdrawn')
-      const [a, b] = [mine[0], mine[1] ?? mine[0]]
-      return ['What do I need to do this week?', ...(a ? [`Is ${first(a.hire.id)} on track for ${fmtShort(a.hire.start)}?`, `Draft my welcome message for ${first(a.hire.id)}`, `Could ${first(b.hire.id)} start a week earlier?`] : [])]
+      // A hire who needs attention comes first; "start earlier" is only offered for one who's on track.
+      const a = mine.find((v) => v.status === 'atrisk' || v.status === 'behind') ?? mine[0]
+      const early = mine.find((v) => v.status === 'ontrack' || v.status === 'ready')
+      return ['What do I need to do this week?', ...(a ? [`Is ${first(a.hire.id)} on track for ${fmtShort(a.hire.start)}?`, `Draft my welcome message for ${first(a.hire.id)}`] : []), ...(early ? [`Could ${first(early.hire.id)} start a week earlier?`] : [])]
     }
     case 'recruiter':
       return ['Where is Wanda in the process?', 'Is Nov 16 realistic for a Lisbon hire?', 'Who starts in the next two weeks?']

@@ -11,7 +11,6 @@ import { Outbox } from './presenter/Outbox'
 import { CommandPalette } from './presenter/CommandPalette'
 import { ChangeDateDialog } from './presenter/ChangeDateDialog'
 import { Intro } from './presenter/Intro'
-import { clearChats } from './assistant/AssistantPanel'
 import { useNarrow } from './lib/cn'
 
 // "System" follows the host's explicit choice (data-theme on the root) and then the OS setting.
@@ -57,7 +56,7 @@ function useShortcuts() {
       else if (e.key === 'o') s.set({ outbox: !s.outbox })
       else if (e.key === 't') s.set({ tags: !s.tags })
       else if (e.key === '.') s.set({ presenterHidden: !s.presenterHidden })
-      else if (e.key === 'R' && e.shiftKey) { s.reset(); clearChats() }
+      else if (e.key === 'R' && e.shiftKey) s.reset()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

@@ -34,7 +34,9 @@ function Inner({ hireId, initial }: { hireId: string; initial?: number }) {
     const replanned = v.steps.filter((st) => st.state !== 'verified' && st.state !== 'na' && next.by[st.key] && next.by[st.key].due !== st.due).length
     const before = messagesFor(v, ctx, s.msgEdits)
     const after = messagesFor(next, ctx, s.msgEdits)
-    const moved = after.filter((m) => m.status === 'scheduled' && before.find((b) => b.key === m.key)?.day !== m.day).length
+    // Count what the timeline will mark "moved from": scheduled sends, and ones waiting on an event with an expected day.
+    const when = (m: (typeof after)[number]) => m.day ?? m.expected
+    const moved = after.filter((m) => (m.status === 'scheduled' || m.status === 'waiting') && when(m) != null && when(before.find((b) => b.key === m.key) ?? m) !== when(m)).length
     const sentWithDate = before.filter((m) => m.status === 'sent' && m.template.trigger.type === 'rel')
     const oldSession = SESSIONS.find((x) => x.day === v.hire.start && x.group === groupFor(v.hire))
     const newSession = SESSIONS.find((x) => x.day === to && x.group === groupFor(v.hire))

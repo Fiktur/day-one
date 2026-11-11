@@ -7,7 +7,6 @@ import { SCENARIOS, runScenario } from '../engine/scenarios'
 import { TODAY, fmtDay } from '../lib/dates'
 import { Tooltip } from '../ui/parts'
 import { Segmented, springs, motion, AnimatePresence } from '../ui/motion'
-import { clearChats } from '../assistant/AssistantPanel'
 import { sfx } from '../ui/fx'
 
 function IconBtn({ on, label, onClick, children }: { on?: boolean; label: string; onClick: () => void; children: React.ReactNode }) {
@@ -103,7 +102,7 @@ export function PresenterBar() {
         </span>
         <IconBtn on={s.sound} label={s.sound ? 'Sound on' : 'Sound off'} onClick={() => { s.set({ sound: !s.sound }); window.setTimeout(() => sfx('pop'), 30) }}>{s.sound ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}</IconBtn>
         <span className="hidden sm:contents"><IconBtn label="Jump anywhere  (⌘K)" onClick={() => s.set({ palette: true })}><CommandIcon className="h-4 w-4" /></IconBtn></span>
-        <IconBtn label="Reset the demo  (Shift+R)" onClick={() => { s.reset(); clearChats() }}><RotateCcw className="h-4 w-4" /></IconBtn>
+        <IconBtn label="Reset the demo  (Shift+R)" onClick={() => s.reset()}><RotateCcw className="h-4 w-4" /></IconBtn>
         <IconBtn label="Hide this bar  (.)" onClick={() => s.set({ presenterHidden: true })}><ChevronDown className="h-4 w-4 rotate-180" /></IconBtn>
       </div>
     </motion.div>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowLeft, Eye, Lock, Pencil } from 'lucide-react'
+import { ArrowLeft, Lock, Pencil } from 'lucide-react'
 import { cn, lc, plural } from '../../lib/cn'
 import { useNav } from '../../nav/NavContext'
 import { useDemo } from '../../engine/store'
@@ -117,8 +117,7 @@ export function ManagerHire() {
                     <>
                       <p className="mt-1.5 text-xs text-muted">{m.edited ? 'Your version will send.' : 'The default sends unless you edit it'}{m.editableUntil != null ? ` · edits close ${fmtDay(m.editableUntil)}` : ''}</p>
                       <div className="mt-2 flex gap-2">
-                        <Button size="xs" onClick={() => setEditing(m.key)}><Eye className="h-3 w-3" />Preview</Button>
-                        <Button size="xs" onClick={() => setEditing(m.key)}><Pencil className="h-3 w-3" />Edit</Button>
+                        <Button size="xs" onClick={() => setEditing(m.key)}><Pencil className="h-3 w-3" />Preview or edit</Button>
                       </div>
                     </>
                   )}

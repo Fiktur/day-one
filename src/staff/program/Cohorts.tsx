@@ -85,7 +85,8 @@ export function Cohorts() {
                     <Glyph state={confirmed(s, r) ? 'verified' : 'open'} size={12} />
                     <span className="font-mono text-xs text-muted">{r.time}</span>
                     <span className="min-w-0"><span className="block truncate">{r.title}</span><span className="block truncate text-xs text-muted">{r.who}{confirmed(s, r) ? '' : ' · speaker not confirmed'}</span></span>
-                    {!confirmed(s, r) && <Button size="xs" variant="primary" onClick={(e) => { burst('small', e.currentTarget); const st = useDemo.getState(); st.set({ speakers: [...st.speakers, `${s.id}:${r.time}`] }); toast.success(`${r.who} confirmed for ${r.title}`, { description: `${fmtShort(s.day)} · ${s.group}` }) }}>Confirm speaker</Button>}
+                    {/* Invites come first: until they're out, confirming a speaker is the second button, not a rival primary. */}
+                    {!confirmed(s, r) && <Button size="xs" variant={sent(s) ? 'primary' : 'secondary'} onClick={(e) => { burst('small', e.currentTarget); const st = useDemo.getState(); st.set({ speakers: [...st.speakers, `${s.id}:${r.time}`] }); toast.success(`${r.who} confirmed for ${r.title}`, { description: `${fmtShort(s.day)} · ${s.group}` }) }}>Confirm speaker</Button>}
                   </li>
                 ))}
               </ol>

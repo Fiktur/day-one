@@ -14,6 +14,7 @@ import { Emoji } from '../../ui/assets'
 import { MapLegend, NODE_META, SystemsMap, type MapNode } from './SystemsMap'
 import { useAffected } from '../program/Incident'
 import { safeName } from '../../engine/derive'
+import { people } from '../../data/people'
 
 const SYSTEMS: Exclude<SystemId, 'dayone'>[] = ['greenhouse', 'workday', 'checkr', 'firstbase', 'google', 'calendar', 'immigration', 'benefits', 'badge']
 
@@ -121,27 +122,27 @@ function SystemDetail({ sel }: { sel: MapNode }) {
                 ))}
               </dl>
             ) : <p className="text-[13px] text-muted">No API. People confirm these steps in Day One, with the date they happened.</p>}
-            {/* Outages are staged from the presenter bar (scenario 5); staff only get the real control. */}
-            {s.down[sel] != null && (
-              <div className="flex flex-wrap items-center gap-2 pt-1">
-                <Button size="sm" variant="ghost" onClick={() => toast(`${systemNames[sel]} still isn't responding`, { description: 'Nothing was lost. Day One tries again in 5 minutes and resumes from the step that failed.' })}><RefreshCw className="h-3.5 w-3.5" />Retry now</Button>
-              </div>
-            )}
           </Card>
   )
 }
 
 /** What a down system is holding up, and what Day One will retry once it's back. */
 function DownSteps({ sys, titled }: { sys: SystemId; titled?: boolean }) {
-  const { person } = useNav()
+  const { person, viewer } = useNav()
   const affected = useAffected(sys)
+  const last = useDemo((s) => s.retried[sys])
+  const retry = useDemo((s) => s.retry)
   return (
     <div className="rounded-xl bg-red-soft/60 px-3 py-2 text-[13px]">
-      <div className="font-medium">{titled ? `${systemNames[sys]} isn't responding · ` : ''}{affected.length ? `${affected.length} step${affected.length > 1 ? 's' : ''} can't be checked right now` : 'Nothing is waiting on it right now'}</div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="font-medium">{titled ? `${systemNames[sys]} isn't responding · ` : ''}{affected.length ? `${affected.length} step${affected.length > 1 ? 's' : ''} can't be checked right now` : 'Nothing is waiting on it right now'}</div>
+        {/* Outages are staged from the presenter bar (scenario 5); staff only get the real control. */}
+        <Button size="xs" onClick={() => { retry(sys, viewer); toast(`${systemNames[sys]} still isn't responding`, { description: 'Nothing was lost. The retry is in the log, and Day One keeps trying every 5 minutes.' }) }}><RefreshCw className="h-3 w-3" />Retry now</Button>
+      </div>
       <ul className="mt-1 space-y-0.5 text-xs">
         {affected.map(({ view, step }) => <li key={view.hire.id + step.key}><span className="font-medium">{view.person.name}</span> · {safeName(step, { role: person.role, team: person.team })}</li>)}
       </ul>
-      <div className="mt-1.5 text-xs text-muted">Retry queue: {affected.length} update{affected.length === 1 ? '' : 's'} · next try in 5 min. Each resumes from the step that failed.</div>
+      <div className="mt-1.5 text-xs text-muted">Retry queue: {affected.length} update{affected.length === 1 ? '' : 's'} · {last ? `last tried ${last.at} by ${people[last.by]?.name.split(' ')[0] ?? last.by}, still timing out` : 'next automatic try in 5 min'}. Each resumes from the step that failed.</div>
     </div>
   )
 }
